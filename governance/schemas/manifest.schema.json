@@ -181,6 +181,14 @@
         }
       }
     },
+    "skills": {
+      "type": "array",
+      "description": "Ordered list of Python skill module names to execute sequentially. Each name maps to skills/<name>.py exposing run(data: dict) -> dict.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    },
     "logging": {
       "type": "object",
       "properties": {

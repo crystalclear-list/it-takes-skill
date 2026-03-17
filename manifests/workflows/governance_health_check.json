@@ -1,0 +1,105 @@
+{
+  "workflow_id": "governance_health_check",
+  "name": "Governance Health Check",
+  "description": "Verifies that all required governance files exist and are non-empty. Runs before any workflow dispatch as a lightweight pre-flight check.",
+  "risk_level": "low",
+
+  "inputs": {
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this check is being run (pre-dispatch, scheduled, manual)."
+    }
+  },
+
+  "outputs": {
+    "status": {
+      "type": "string",
+      "description": "pass or fail."
+    },
+    "missing_files": {
+      "type": "array",
+      "description": "Governance files that are absent or empty."
+    },
+    "present_files": {
+      "type": "array",
+      "description": "Governance files confirmed present and non-empty."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["logs/workflows/", "reports/"],
+    "forbidden_write_paths": ["governance/", "agents/core/", "manifests/workflows/", ".git/"],
+    "enforce_staging_only": true
+  },
+
+  "skills": [
+    "check_governance_files",
+    "summarize_validation_results"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_check_governance_files",
+      "name": "Verify required governance files exist",
+      "description": "Audit Agent reads governance/ and confirms all required files are present and non-empty.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_read"],
+        "allowed_paths": ["governance/"],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": []
+      }
+    },
+    {
+      "id": "step_2_report",
+      "name": "Write health check report",
+      "description": "Reporting Agent writes results to reports/ and logs/workflows/.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_write_staging"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": ["git_operations"],
+        "forbidden_paths": ["governance/", "agents/core/", "manifests/workflows/", ".git/"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": []
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/governance_health_check.log"
+  }
+}

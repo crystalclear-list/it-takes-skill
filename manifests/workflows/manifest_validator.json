@@ -113,6 +113,13 @@
     ]
   },
 
+  "skills": [
+    "load_all_manifests",
+    "validate_manifest_schema",
+    "validate_governance_rules",
+    "summarize_validation_results"
+  ],
+
   "steps": [
     {
       "id": "step_1_read_inputs",

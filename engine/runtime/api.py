@@ -9,19 +9,16 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from engine.runtime.errors import GovernanceError
-from engine.runtime.executor import execute_steps
+from engine.runtime.manifest.loader import load_manifest
+from engine.runtime.manifest.validator import validate_manifest
+from engine.runtime.skills.resolver import resolve_skills
+from engine.runtime.executor.sequential import execute
 from engine.runtime.io.log_writer import write_logs
 from engine.runtime.io.output_writer import write_output
-from engine.runtime.skill_loader import resolve_steps
-from engine.runtime.validator import validate
-
-MANIFEST_ROOT = Path("manifests/workflows")
 
 
 def run(workflow_id: str, input_data: dict | None = None) -> dict:
@@ -34,30 +31,28 @@ def run(workflow_id: str, input_data: dict | None = None) -> dict:
     Returns a structured result dict on success.
     """
     run_id = str(uuid.uuid4())
-    events: list[dict] = []
-
-    _log(events, run_id, "runtime", "run_start", {
-        "workflow_id": workflow_id,
-        "input_keys": list((input_data or {}).keys()),
-    })
-
-    log_path: Path | None = None
+    events: list[str] = [
+        _event_line(run_id, "runtime", "run_start", {
+            "workflow_id": workflow_id,
+            "input_keys": list((input_data or {}).keys()),
+        })
+    ]
 
     try:
-        manifest = _load_manifest(workflow_id)
-        validate(manifest)
-        steps = resolve_steps(manifest)
-        result, events = execute_steps(steps, input_data or {}, run_id, events, _log)
+        manifest = load_manifest(workflow_id)
+        validate_manifest(manifest)
+        skills = resolve_skills(manifest)
+        result, skill_events = execute(skills, input_data or {})
+
+        events.extend(skill_events)
 
         output_path = write_output(workflow_id, result)
-        event_lines = [_event_to_line(e) for e in events]
-        log_path = write_logs(workflow_id, event_lines)
-
-        _log(events, run_id, "runtime", "run_complete", {
+        events.append(_event_line(run_id, "runtime", "run_complete", {
             "status": "success",
             "output_path": output_path,
-            "log_path": log_path,
-        })
+        }))
+
+        log_path = write_logs(workflow_id, events)
 
         return {
             "status": "success",
@@ -69,40 +64,21 @@ def run(workflow_id: str, input_data: dict | None = None) -> dict:
         }
 
     except GovernanceError as exc:
-        _log(events, run_id, "runtime", "governance_halt", {
+        events.append(_event_line(run_id, "runtime", "governance_halt", {
             **exc.to_dict(),
             "halt_on_violation": True,
-        })
-        event_lines = [_event_to_line(e) for e in events]
-        write_logs(workflow_id, event_lines)
+        }))
+        write_logs(workflow_id, events)
         raise
 
 
-def _load_manifest(workflow_id: str) -> dict:
-    from engine.runtime.errors import ManifestError
-    path = MANIFEST_ROOT / f"{workflow_id}.json"
-    if not path.exists():
-        raise ManifestError(f"Manifest not found: {path}")
-    return json.loads(path.read_text())
-
-
-def _log(
-    events: list[dict],
-    run_id: str,
-    agent_id: str,
-    action: str,
-    data: dict,
-) -> None:
-    events.append({
+def _event_line(run_id: str, agent_id: str, action: str, data: dict) -> str:
+    """Serialises a structured event to a JSON Line string."""
+    import json
+    return json.dumps({
         "run_id": run_id,
         "agent_id": agent_id,
         "action": action,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **data,
     })
-
-
-def _event_to_line(event: dict) -> str:
-    """Serialises an event dict to a JSON Line string for log_writer."""
-    import json
-    return json.dumps(event)

@@ -11,6 +11,8 @@ Hierarchy:
     └── RuntimeExecutionError     unrecoverable internal executor failure
 """
 
+from __future__ import annotations
+
 
 class RuntimeErrorBase(Exception):
     """

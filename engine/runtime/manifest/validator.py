@@ -12,11 +12,10 @@ from pathlib import Path
 from engine.runtime.errors import ManifestError
 
 _MANIFEST_SCHEMA_PATH = Path("governance/schemas/manifest.schema.json")
-_AGENT_SCHEMA_PATH = Path("governance/schemas/agent.schema.json")
 _AGENTS_DIR = Path("agents/core")
 
 
-def validate(manifest: dict) -> None:
+def validate_manifest(manifest: dict) -> None:
     """
     Validates a manifest dict against the JSON Schema and governance rules.
     Raises ManifestError on any violation — halt_on_violation=True.
@@ -34,7 +33,7 @@ def _load_registered_agent_ids() -> set[str]:
     """
     if not _AGENTS_DIR.exists():
         raise ManifestError(
-            f"agents/core/ not found. Cannot verify agent IDs referenced in steps."
+            "agents/core/ not found. Cannot verify agent IDs referenced in steps."
         )
     ids = set()
     for agent_file in _AGENTS_DIR.glob("*.json"):
