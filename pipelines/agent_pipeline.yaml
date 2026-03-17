@@ -1,0 +1,52 @@
+version: 1
+description: >
+  Core multi-agent pipeline: Planner -> Executor -> Auditor -> Finance-Prep -> Money Key.
+  Governed by governance/charter.yaml. All financial and irreversible actions require Money Key (human) approval.
+
+stages:
+  - name: planner
+    agent_config: agents/planner.config.json
+    input_from: human
+    output_to: executor
+
+  - name: executor
+    agent_config: agents/executor.config.json
+    input_from: planner
+    output_to: auditor
+
+  - name: auditor
+    agent_config: agents/auditor.config.json
+    input_from: executor
+    output_to:
+      - finance_prep
+      - human_review
+
+  - name: finance_prep
+    agent_config: agents/finance_prep.config.json
+    input_from: auditor
+    output_to: money_key
+
+  - name: money_key
+    agent_config: agents/money_key.config.json
+    input_from: finance_prep
+    output_to: human
+
+escalation_rules:
+  financial_or_irreversible:
+    trigger_on:
+      - money
+      - legal_status
+      - identity
+      - irreversible_state
+    route_to:
+      - money_key
+      - human
+
+safety_gates:
+  pre_execution:
+    - intent_verification
+    - risk_assessment
+  post_execution:
+    - output_validator
+    - self_audit
+    - provenance_tracker

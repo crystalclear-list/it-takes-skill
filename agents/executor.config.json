@@ -1,0 +1,9 @@
+{
+  "name": "executor",
+  "role": "Executor / Operator",
+  "primer_ref": "governance/agent_primers/executor.md",
+  "skills": ["document_pipeline", "transformation_engine", "content_engine", "extraction_engine"],
+  "governance_profile": "governance/charter.yaml",
+  "input": "structured_plans",
+  "output": "artifacts_and_logs"
+}

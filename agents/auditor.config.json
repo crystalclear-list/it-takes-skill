@@ -1,0 +1,9 @@
+{
+  "name": "auditor",
+  "role": "Auditor / Safety / Compliance",
+  "primer_ref": "governance/agent_primers/auditor.md",
+  "skills": ["audit_engine", "self_audit", "output_validator", "alignment_check", "bias_scan"],
+  "governance_profile": "governance/charter.yaml",
+  "input": "plans_and_artifacts",
+  "output": "audit_reports"
+}

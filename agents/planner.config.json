@@ -1,0 +1,9 @@
+{
+  "name": "planner",
+  "role": "Planner / Strategist",
+  "primer_ref": "governance/agent_primers/planner.md",
+  "skills": ["decision_engine", "research_agent"],
+  "governance_profile": "governance/charter.yaml",
+  "input": "high_level_goals",
+  "output": "structured_plans"
+}
