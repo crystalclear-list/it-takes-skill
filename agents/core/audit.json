@@ -1,0 +1,65 @@
+{
+  "agent_id": "AGENT-AUDIT-001",
+  "name": "Audit Agent",
+  "role": "audit_enforcer",
+  "description": "Validates workflow outputs, checks safety boundaries, and produces audit reports. Cannot change files or external systems.",
+  "owner": "governance",
+  "environment": "local",
+  "risk_level": "low",
+
+  "capabilities": [
+    "schema_validation",
+    "policy_enforcement",
+    "risk_assessment"
+  ],
+
+  "skills_required": [
+    "atomic/validate_schema",
+    "atomic/check_safety",
+    "atomic/check_pii",
+    "molecular/audit_workflow_outputs",
+    "system/governance_enforce"
+  ],
+
+  "tool_constraints": {
+    "allowed_tools": [
+      "json_schema_validate",
+      "policy_evaluator",
+      "log_reader"
+    ],
+    "denied_tools": [
+      "file_write",
+      "network_mutation",
+      "database_write"
+    ]
+  },
+
+  "inputs": {
+    "artifacts": {
+      "type": "array",
+      "items": "object"
+    },
+    "workflow_log": "string",
+    "workflow_manifest": "json"
+  },
+
+  "outputs": {
+    "audit_report": "string",
+    "violations": {
+      "type": "array",
+      "items": "object"
+    },
+    "risk_level": "string"
+  },
+
+  "safety": {
+    "halt_on_violation": true,
+    "max_violations_reported": 100
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_all_violations": true,
+    "log_decision_rationale": true
+  }
+}

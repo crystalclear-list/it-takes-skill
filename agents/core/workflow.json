@@ -1,0 +1,75 @@
+{
+  "agent_id": "AGENT-WORKFLOW-001",
+  "name": "Workflow Agent",
+  "role": "workflow_executor",
+  "description": "Executes multi-stage workflows and produces raw artifacts. Does not directly execute financial or infrastructure actions.",
+  "owner": "os-core",
+  "environment": "local",
+  "risk_level": "high",
+
+  "capabilities": [
+    "workflow_load",
+    "workflow_step_execution",
+    "workflow_context_propagation"
+  ],
+
+  "skills_required": [
+    "atomic/load_manifest",
+    "atomic/run_stage",
+    "atomic/resolve_parameters",
+    "molecular/pipeline_execute",
+    "system/workflow_orchestrate"
+  ],
+
+  "tool_constraints": {
+    "allowed_tools": [
+      "local_fs_read",
+      "local_fs_write",
+      "shell_safe",
+      "http_get_readonly"
+    ],
+    "denied_tools": [
+      "direct_payment",
+      "infrastructure_mutation",
+      "privileged_shell",
+      "raw_db_write"
+    ]
+  },
+
+  "inputs": {
+    "workflow_manifest": "json",
+    "parameters": {
+      "type": "object",
+      "description": "User- or system-supplied parameters for the workflow."
+    }
+  },
+
+  "outputs": {
+    "artifacts": {
+      "type": "array",
+      "items": "object"
+    },
+    "workflow_log": "string",
+    "warnings": {
+      "type": "array",
+      "items": "string"
+    }
+  },
+
+  "safety": {
+    "requires_human_approval": [
+      "external_api_calls",
+      "financial_actions",
+      "infrastructure_changes"
+    ],
+    "halt_on_violation": true,
+    "max_runtime_seconds": 600,
+    "max_substeps": 50
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_each_stage": true,
+    "attach_provenance_id": true
+  }
+}

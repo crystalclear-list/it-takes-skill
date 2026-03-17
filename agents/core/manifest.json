@@ -1,0 +1,69 @@
+{
+  "agent_id": "AGENT-MANIFEST-001",
+  "name": "Manifest Agent",
+  "role": "manifest_editor",
+  "description": "Generates and updates manifests for skills, workflows, and agents. Proposals are written to a staging area and require human approval.",
+  "owner": "os-core",
+  "environment": "local",
+  "risk_level": "medium",
+
+  "capabilities": [
+    "manifest_creation",
+    "manifest_update",
+    "schema_alignment"
+  ],
+
+  "skills_required": [
+    "atomic/read_schema",
+    "atomic/write_manifest",
+    "atomic/diff_manifest",
+    "molecular/manifest_generate",
+    "system/manifest_validate"
+  ],
+
+  "tool_constraints": {
+    "allowed_tools": [
+      "local_fs_read",
+      "local_fs_write_staging"
+    ],
+    "denied_tools": [
+      "overwrite_production_manifests",
+      "schema_delete",
+      "governance_file_modify_direct"
+    ]
+  },
+
+  "inputs": {
+    "specification": {
+      "type": "object",
+      "description": "Desired manifest spec: fields, types, constraints."
+    },
+    "schema": "json",
+    "target_type": {
+      "type": "string",
+      "enum": ["skill", "workflow", "agent"]
+    }
+  },
+
+  "outputs": {
+    "manifest": "json",
+    "validation_report": "string",
+    "staging_path": "string"
+  },
+
+  "safety": {
+    "requires_human_approval": [
+      "schema_changes",
+      "governance_modifications",
+      "permission_elevation"
+    ],
+    "write_to_staging_only": true,
+    "staging_directory": "manifests/staging/"
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_all_changes": true,
+    "log_diffs": true
+  }
+}

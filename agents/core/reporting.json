@@ -1,0 +1,75 @@
+{
+  "agent_id": "AGENT-REPORTING-001",
+  "name": "Reporting Agent",
+  "role": "report_generator",
+  "description": "Generates human-readable reports from workflow artifacts and audit results with strict redaction of sensitive data.",
+  "owner": "os-core",
+  "environment": "local",
+  "risk_level": "low",
+
+  "capabilities": [
+    "markdown_formatting",
+    "summary_generation",
+    "scenario_reporting"
+  ],
+
+  "skills_required": [
+    "atomic/format_markdown",
+    "atomic/summarize",
+    "atomic/redact_sensitive",
+    "molecular/report_generate",
+    "system/report_pipeline"
+  ],
+
+  "tool_constraints": {
+    "allowed_tools": [
+      "markdown_renderer",
+      "template_engine"
+    ],
+    "denied_tools": [
+      "raw_database_access",
+      "external_api_write"
+    ]
+  },
+
+  "inputs": {
+    "artifacts": {
+      "type": "array",
+      "items": "object"
+    },
+    "audit_report": "string",
+    "workflow_log": "string",
+    "report_type": {
+      "type": "string",
+      "enum": ["summary", "scenario", "optimization"]
+    }
+  },
+
+  "outputs": {
+    "summary_report": "string",
+    "scenario_report": "string",
+    "optimization_report": "string",
+    "redaction_log": {
+      "type": "array",
+      "items": "string"
+    }
+  },
+
+  "safety": {
+    "no_sensitive_data": true,
+    "enforce_redaction": true,
+    "pii_categories_blocked": [
+      "credit_card",
+      "ssn",
+      "email",
+      "phone",
+      "exact_address"
+    ]
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_redactions": true,
+    "log_report_generations": true
+  }
+}
