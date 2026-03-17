@@ -16,7 +16,8 @@ from pathlib import Path
 
 from engine.runtime.errors import GovernanceError
 from engine.runtime.executor import execute_steps
-from engine.runtime.output_writer import write_artifact, write_log
+from engine.runtime.io.log_writer import write_logs
+from engine.runtime.io.output_writer import write_output
 from engine.runtime.skill_loader import resolve_steps
 from engine.runtime.validator import validate
 
@@ -48,22 +49,22 @@ def run(workflow_id: str, input_data: dict | None = None) -> dict:
         steps = resolve_steps(manifest)
         result, events = execute_steps(steps, input_data or {}, run_id, events, _log)
 
-        output_path = write_artifact(workflow_id, run_id, result)
-        log_path = write_log(workflow_id, run_id, events)
+        output_path = write_output(workflow_id, result)
+        event_lines = [_event_to_line(e) for e in events]
+        log_path = write_logs(workflow_id, event_lines)
 
         _log(events, run_id, "runtime", "run_complete", {
             "status": "success",
-            "output_path": str(output_path),
-            "log_path": str(log_path),
+            "output_path": output_path,
+            "log_path": log_path,
         })
-        write_log(workflow_id, run_id, events, path_override=log_path)
 
         return {
             "status": "success",
             "run_id": run_id,
             "workflow_id": workflow_id,
-            "output": str(output_path),
-            "logs": str(log_path),
+            "output": output_path,
+            "logs": log_path,
             "result": result,
         }
 
@@ -72,7 +73,8 @@ def run(workflow_id: str, input_data: dict | None = None) -> dict:
             **exc.to_dict(),
             "halt_on_violation": True,
         })
-        write_log(workflow_id, run_id, events, path_override=log_path)
+        event_lines = [_event_to_line(e) for e in events]
+        write_logs(workflow_id, event_lines)
         raise
 
 
@@ -98,3 +100,9 @@ def _log(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **data,
     })
+
+
+def _event_to_line(event: dict) -> str:
+    """Serialises an event dict to a JSON Line string for log_writer."""
+    import json
+    return json.dumps(event)
