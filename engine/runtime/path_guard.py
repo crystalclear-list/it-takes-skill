@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from engine.runtime.errors import ForbiddenPathError, ManifestError
+from engine.runtime.errors import PathForbiddenError, ManifestError
 
 _FORBIDDEN_PATHS_FILE = Path("governance/forbidden_paths.json")
 _cache: list[Path] | None = None
@@ -31,7 +31,7 @@ def _load_forbidden_paths() -> list[Path]:
 
 def assert_path_allowed(path: Path) -> None:
     """
-    Raises ForbiddenPathError if `path` is inside any forbidden write path.
+    Raises PathForbiddenError if `path` is inside any forbidden write path.
     Called before every disk write in the runtime.
     """
     resolved = path.resolve()
@@ -41,6 +41,6 @@ def assert_path_allowed(path: Path) -> None:
         forbidden_resolved = (repo_root / forbidden).resolve()
         try:
             resolved.relative_to(forbidden_resolved)
-            raise ForbiddenPathError(str(path))
+            raise PathForbiddenError(str(path))
         except ValueError:
             pass  # Not relative — path is allowed

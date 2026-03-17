@@ -69,8 +69,7 @@ def run(workflow_id: str, input_data: dict | None = None) -> dict:
 
     except GovernanceError as exc:
         _log(events, run_id, "runtime", "governance_halt", {
-            "error_type": type(exc).__name__,
-            "error": str(exc),
+            **exc.to_dict(),
             "halt_on_violation": True,
         })
         write_log(workflow_id, run_id, events, path_override=log_path)

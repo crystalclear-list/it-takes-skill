@@ -11,7 +11,7 @@ from typing import Any
 
 import anthropic
 
-from engine.runtime.errors import SkillError
+from engine.runtime.errors import RuntimeExecutionError, SkillError
 
 MODEL = "claude-sonnet-4-6"
 
@@ -63,7 +63,13 @@ def execute_steps(
                 f"Claude API call failed: {exc}",
             )
 
-        output_text = response.content[0].text
+        try:
+            output_text = response.content[0].text
+        except (IndexError, AttributeError) as exc:
+            raise RuntimeExecutionError(
+                f"Unexpected API response structure at step '{step_id}': {exc}",
+                context={"step_id": step_id},
+            )
 
         try:
             context = json.loads(output_text)
