@@ -1,55 +1,75 @@
 {
-  "agent_id": "AGENT-WORKFLOW-001",
+  "agent_id": "workflow-agent",
   "name": "Workflow Agent",
   "role": "workflow_executor",
-  "description": "Executes multi-stage workflows and produces raw artifacts. Does not directly execute financial or infrastructure actions.",
-  "owner": "os-core",
+  "description": "Executes predefined workflows based on manifests/workflows/ definitions, constrained to declared tools and paths, never mutating infrastructure or governance.",
+  "owner": "operator",
   "environment": "local",
-  "risk_level": "high",
+  "risk_level": "medium",
 
   "capabilities": [
-    "workflow_load",
-    "workflow_step_execution",
-    "workflow_context_propagation"
+    "read_and_interpret_workflow_manifests_from_manifests_workflows",
+    "invoke_specialized_agents_through_orchestrator_by_role",
+    "propose_workflow_changes_to_manifests_staging_only"
   ],
 
   "skills_required": [
-    "atomic/load_manifest",
-    "atomic/run_stage",
-    "atomic/resolve_parameters",
-    "molecular/pipeline_execute",
-    "system/workflow_orchestrate"
+    "workflow_interpretation_and_step_sequencing",
+    "manifest_declared_input_output_understanding",
+    "coordination_with_audit_and_manifest_agents_via_orchestrator"
   ],
 
   "tool_constraints": {
+    "allowed_paths": {
+      "read": [
+        "manifests/workflows/",
+        "agents/core/"
+      ],
+      "write": [
+        "manifests/staging/",
+        "logs/workflows/"
+      ]
+    },
     "allowed_tools": [
       "local_fs_read",
-      "local_fs_write",
-      "shell_safe",
-      "http_get_readonly"
+      "local_fs_write_staging",
+      "log_emit"
     ],
     "denied_tools": [
-      "direct_payment",
+      "git_operations",
       "infrastructure_mutation",
-      "privileged_shell",
-      "raw_db_write"
+      "financial_tools",
+      "pii_handling_tools",
+      "governance_file_write"
     ]
   },
 
   "inputs": {
-    "workflow_manifest": "json",
+    "workflow_manifest_name": {
+      "type": "string",
+      "description": "Name of the selected workflow manifest to execute."
+    },
     "parameters": {
       "type": "object",
       "description": "User- or system-supplied parameters for the workflow."
+    },
+    "governance_constraints": {
+      "type": "object",
+      "description": "Current manifests and governance constraints (read-only)."
     }
   },
 
   "outputs": {
-    "artifacts": {
+    "execution_traces": {
       "type": "array",
-      "items": "object"
+      "items": "object",
+      "description": "Execution traces and result artifacts written to logs/workflows/."
     },
-    "workflow_log": "string",
+    "staging_proposals": {
+      "type": "array",
+      "items": "string",
+      "description": "Paths of new or updated workflow proposals written to manifests/staging/."
+    },
     "warnings": {
       "type": "array",
       "items": "string"
@@ -58,11 +78,18 @@
 
   "safety": {
     "requires_human_approval": [
+      "all_cross_agent_step_transitions",
       "external_api_calls",
       "financial_actions",
       "infrastructure_changes"
     ],
     "halt_on_violation": true,
+    "forbidden": [
+      "direct_git_operations",
+      "schema_deletion",
+      "governance_mutation",
+      "circumvent_orchestrator"
+    ],
     "max_runtime_seconds": 600,
     "max_substeps": 50
   },
@@ -70,6 +97,8 @@
   "logging": {
     "log_level": "info",
     "log_each_stage": true,
-    "attach_provenance_id": true
+    "log_agent_invocations_with_parameters_and_outputs": true,
+    "attach_workflow_run_id": true,
+    "audit_file": "logs/workflows/workflow-agent.log"
   }
 }

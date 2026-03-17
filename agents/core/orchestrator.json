@@ -1,106 +1,181 @@
 {
-  "agent_id": "AGENT-ORCHESTRATOR-001",
+  "agent_id": "orchestrator-agent",
   "name": "Orchestrator Agent",
-  "role": "orchestrator",
-  "description": "Coordinates the five core agents (Repo, Workflow, Audit, Manifest, Reporting) to execute governed multi-step operations. Calls agents by role only. Enforces human approval on all cross-agent operations that are financial, infrastructure, or irreversible. Never executes actions directly — only routes, sequences, and gates.",
-  "owner": "os-core",
+  "role": "multi_agent_conductor",
+  "description": "Dispatches agents by role according to workflow manifests, enforces human-approval gates at all cross-agent transitions, tracks end-to-end provenance, merges outputs deterministically, and blocks privilege escalation, recursive orchestration, and direct domain actions. High coordination power, zero direct domain power.",
+  "owner": "operator",
   "environment": "local",
   "risk_level": "high",
 
   "capabilities": [
-    "agent_routing",
-    "cross_agent_sequencing",
-    "human_approval_gate",
-    "escalation_handling",
-    "provenance_stitching"
+    "resolve_workflow_requirements_into_role_based_agent_invocation_sequences",
+    "enforce_mandatory_human_approvals_at_all_cross_agent_transitions",
+    "maintain_global_run_metadata_and_assemble_end_to_end_provenance",
+    "merge_agent_outputs_deterministically_via_predefined_precedence_and_conflict_rules"
   ],
 
   "skills_required": [
-    "system/workflow_orchestrate",
-    "meta/intent_verification",
-    "meta/risk_assessment",
-    "meta/escalation_router",
-    "meta/provenance_tracker"
+    "workflow_scheduling_and_dependency_handling",
+    "governance_constraint_understanding_for_agent_interactions",
+    "provenance_tracking_and_reconciliation"
   ],
 
   "callable_agents": [
     {
-      "agent_id": "AGENT-REPO-001",
+      "agent_id": "repo-agent",
       "role": "repo_maintenance",
-      "call_conditions": ["repo_change_required", "gitignore_update", "file_staging"],
-      "approval_required": false
+      "call_conditions": [
+        "repo_validation_required",
+        "staging_to_production_promotion_approved"
+      ],
+      "requires_human_approval": true
     },
     {
-      "agent_id": "AGENT-WORKFLOW-001",
+      "agent_id": "workflow-agent",
       "role": "workflow_executor",
-      "call_conditions": ["workflow_manifest_loaded", "parameters_validated"],
-      "approval_required": false
+      "call_conditions": [
+        "workflow_manifest_selected",
+        "parameters_validated"
+      ],
+      "requires_human_approval": false
     },
     {
-      "agent_id": "AGENT-AUDIT-001",
+      "agent_id": "audit-agent",
       "role": "audit_enforcer",
-      "call_conditions": ["workflow_artifacts_ready", "pre_delivery_required"],
-      "approval_required": false
+      "call_conditions": [
+        "workflow_execution_complete",
+        "staging_proposal_ready",
+        "pre_repo_promotion"
+      ],
+      "requires_human_approval": false
     },
     {
-      "agent_id": "AGENT-MANIFEST-001",
+      "agent_id": "manifest-agent",
       "role": "manifest_editor",
-      "call_conditions": ["schema_change_requested", "new_manifest_required"],
-      "approval_required": true,
-      "approval_triggers": ["schema_changes", "governance_modifications", "permission_elevation"]
+      "call_conditions": [
+        "audit_approved",
+        "change_request_doc_present"
+      ],
+      "requires_human_approval": true
     },
     {
-      "agent_id": "AGENT-REPORTING-001",
+      "agent_id": "reporting-agent",
       "role": "report_generator",
-      "call_conditions": ["audit_complete", "artifacts_available"],
-      "approval_required": false
+      "call_conditions": [
+        "run_complete_or_halted"
+      ],
+      "requires_human_approval": false
     }
   ],
 
+  "execution_flow": {
+    "description": "Deterministic 6-step sequence for all governed change and workflow runs.",
+    "steps": [
+      {
+        "step": 1,
+        "agent": "repo-agent",
+        "action": "validate_repo_state",
+        "human_approval_required": true,
+        "description": "Validate branch cleanliness, sync status, and absence of interfering uncommitted changes."
+      },
+      {
+        "step": 2,
+        "agent": "workflow-agent",
+        "action": "run_workflow",
+        "human_approval_required": false,
+        "description": "Execute workflow steps by invoking agents by role as declared in the workflow manifest."
+      },
+      {
+        "step": 3,
+        "agent": "audit-agent",
+        "action": "validate_outputs",
+        "human_approval_required": false,
+        "description": "Validate manifests, outputs, and prospective repo diffs against governance. Any violation halts the run."
+      },
+      {
+        "step": 4,
+        "agent": "manifest-agent",
+        "action": "update_manifests_in_staging",
+        "human_approval_required": true,
+        "description": "Generate or revise manifests in manifests/staging/ based on change-requests and audit feedback."
+      },
+      {
+        "step": 5,
+        "agent": "reporting-agent",
+        "action": "generate_reports",
+        "human_approval_required": false,
+        "description": "Synthesize human-readable report of the entire run, decisions, and expected changes."
+      },
+      {
+        "step": 6,
+        "agent": "repo-agent",
+        "action": "commit_results",
+        "human_approval_required": true,
+        "description": "Promote staged manifests to production directories via non-destructive git commits with passing audit."
+      }
+    ],
+    "cross_agent_transition_policy": "all_transitions_require_explicit_human_approval"
+  },
+
   "tool_constraints": {
+    "allowed_paths": {
+      "read": [
+        "manifests/workflows/",
+        "agents/core/",
+        "governance/"
+      ],
+      "write": [
+        "logs/workflows/"
+      ]
+    },
     "allowed_tools": [
-      "agent_invoke",
+      "agent_invoke_by_role",
       "approval_gate",
-      "escalation_trigger",
       "provenance_read",
-      "log_reader"
+      "log_reader",
+      "log_emit"
     ],
     "denied_tools": [
-      "direct_file_write",
-      "direct_payment",
+      "direct_git_operations",
       "shell_exec",
+      "http_calls",
       "database_write",
-      "agent_impersonate"
+      "cloud_api",
+      "financial_tools",
+      "agent_impersonate",
+      "spawn_new_agents",
+      "manifest_write",
+      "governance_write"
     ]
   },
 
   "inputs": {
-    "goal": {
+    "workflow_name": {
       "type": "string",
-      "description": "High-level goal or workflow trigger from human or upstream system."
+      "description": "Selected workflow to run."
     },
-    "context": {
+    "parameters": {
       "type": "object",
-      "description": "Session context: workflow_id, parameters, prior artifacts, approval state."
+      "description": "Workflow parameters."
+    },
+    "agent_manifests": {
+      "type": "object",
+      "description": "Agent manifests from agents/core/ (read-only)."
+    },
+    "governance_policies": {
+      "type": "object",
+      "description": "Governance policies from governance/ (read-only)."
     }
   },
 
   "outputs": {
-    "orchestration_summary": "string",
-    "agent_call_log": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "agent_id": "string",
-          "called_at": "string",
-          "outcome": "string",
-          "artifacts_produced": {
-            "type": "array",
-            "items": "string"
-          }
-        }
-      }
+    "orchestration_log": {
+      "type": "string",
+      "description": "Log describing which agents were called, in what order, and with what approvals."
+    },
+    "run_metadata": {
+      "type": "object",
+      "description": "Aggregated run metadata to feed Reporting Agent: who, what, when, which tools."
     },
     "pending_approvals": {
       "type": "array",
@@ -114,102 +189,47 @@
           "expires_at": "string"
         }
       }
-    },
-    "provenance_id": "string"
+    }
   },
 
-  "execution_policy": {
-    "default_sequence": [
-      "intent_verification",
-      "risk_assessment",
-      "agent_routing",
-      "cross_agent_execution",
-      "audit_gate",
-      "report_generation",
-      "provenance_write"
+  "output_merge_policy": {
+    "conflict_resolution": "predefined_precedence_rules",
+    "precedence_order": [
+      "audit-agent",
+      "repo-agent",
+      "manifest-agent",
+      "workflow-agent",
+      "reporting-agent"
     ],
     "parallel_execution_allowed": false,
-    "max_concurrent_agents": 1,
-    "retry_policy": {
-      "max_retries": 2,
-      "retry_on": ["transient_failure", "timeout"],
-      "no_retry_on": ["governance_violation", "human_rejection", "safety_halt"]
-    }
-  },
-
-  "approval_gates": {
-    "cross_agent_financial": {
-      "trigger": "any_agent_produces_financial_action",
-      "approver_role": "owner",
-      "approval_type": "single",
-      "sla_minutes": 60,
-      "on_timeout": "escalate_and_halt"
-    },
-    "cross_agent_infrastructure": {
-      "trigger": "any_agent_requests_infrastructure_change",
-      "approver_role": "owner",
-      "approval_type": "single",
-      "sla_minutes": 120,
-      "on_timeout": "halt"
-    },
-    "cross_agent_governance": {
-      "trigger": "manifest_agent_proposes_schema_change",
-      "approver_role": "owner",
-      "approval_type": "dual",
-      "sla_minutes": 2880,
-      "on_timeout": "halt"
-    }
-  },
-
-  "escalation_rules": {
-    "safety_violation": {
-      "route_to": "human",
-      "halt_pipeline": true,
-      "log_security_event": true
-    },
-    "audit_failure": {
-      "route_to": "AGENT-AUDIT-001",
-      "retry_allowed": true,
-      "max_retries": 1
-    },
-    "approval_timeout": {
-      "route_to": "human",
-      "halt_pipeline": true,
-      "notify": true
-    },
-    "agent_unavailable": {
-      "route_to": "human",
-      "halt_pipeline": true
-    }
+    "max_concurrent_agents": 1
   },
 
   "safety": {
     "halt_on_violation": true,
-    "requires_human_approval": [
-      "financial_actions",
-      "infrastructure_mutations",
-      "governance_file_changes",
-      "schema_modifications",
-      "permission_elevation",
-      "cross_agent_irreversible_chain"
-    ],
     "forbidden_patterns": [
-      "agent_calls_self",
-      "orchestrator_executes_directly",
-      "approval_bypass",
-      "audit_skip"
+      "recursive_orchestration",
+      "self_invocation",
+      "direct_domain_action",
+      "privilege_escalation",
+      "grant_tools_beyond_manifest",
+      "invent_new_agents",
+      "bypass_audit",
+      "self_modification",
+      "governance_modification"
     ],
     "max_pipeline_depth": 5,
-    "max_total_runtime_seconds": 3600
+    "max_total_runtime_seconds": 3600,
+    "on_approval_timeout": "halt_and_escalate_to_human"
   },
 
   "logging": {
     "log_level": "info",
-    "log_all_agent_calls": true,
+    "log_all_agent_dispatches": true,
     "log_all_approval_decisions": true,
-    "log_escalations": true,
-    "attach_provenance_id": true,
-    "audit_file": "logs/workflows/orchestrator.log"
+    "log_all_escalations": true,
+    "attach_workflow_run_id": true,
+    "audit_file": "logs/workflows/orchestrator-agent.log"
   },
 
   "governance_ref": "governance/charter.yaml",
