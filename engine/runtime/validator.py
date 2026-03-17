@@ -11,15 +11,9 @@ from pathlib import Path
 
 from engine.runtime.errors import ManifestError
 
-_SCHEMA_PATH = Path("governance/schemas/manifest.schema.json")
-_VALID_AGENT_IDS = {
-    "workflow-agent",
-    "audit-agent",
-    "reporting-agent",
-    "repo-agent",
-    "manifest-agent",
-    "orchestrator-agent",
-}
+_MANIFEST_SCHEMA_PATH = Path("governance/schemas/manifest.schema.json")
+_AGENT_SCHEMA_PATH = Path("governance/schemas/agent.schema.json")
+_AGENTS_DIR = Path("agents/core")
 
 
 def validate(manifest: dict) -> None:
@@ -29,7 +23,33 @@ def validate(manifest: dict) -> None:
     """
     _validate_schema(manifest)
     _validate_governance_block(manifest)
-    _validate_steps(manifest)
+    _validate_steps(manifest, _load_registered_agent_ids())
+
+
+def _load_registered_agent_ids() -> set[str]:
+    """
+    Derives valid agent IDs from agents/core/ at validation time.
+    No hardcoded set — adding a new agent manifest automatically registers it.
+    Raises ManifestError if agents/core/ is missing or unreadable.
+    """
+    if not _AGENTS_DIR.exists():
+        raise ManifestError(
+            f"agents/core/ not found. Cannot verify agent IDs referenced in steps."
+        )
+    ids = set()
+    for agent_file in _AGENTS_DIR.glob("*.json"):
+        try:
+            data = json.loads(agent_file.read_text())
+            if "agent_id" in data:
+                ids.add(data["agent_id"])
+        except (json.JSONDecodeError, OSError):
+            raise ManifestError(
+                f"Could not read agent manifest: {agent_file}. "
+                "Corrupt or missing agent manifest is a governance violation."
+            )
+    if not ids:
+        raise ManifestError("No agent manifests found in agents/core/.")
+    return ids
 
 
 def _validate_schema(manifest: dict) -> None:
@@ -40,13 +60,13 @@ def _validate_schema(manifest: dict) -> None:
             "jsonschema is not installed. Run: pip install jsonschema"
         )
 
-    if not _SCHEMA_PATH.exists():
+    if not _MANIFEST_SCHEMA_PATH.exists():
         raise ManifestError(
-            f"Schema file not found: {_SCHEMA_PATH}. "
+            f"Schema file not found: {_MANIFEST_SCHEMA_PATH}. "
             "Cannot validate manifest without governance schema."
         )
 
-    schema = json.loads(_SCHEMA_PATH.read_text())
+    schema = json.loads(_MANIFEST_SCHEMA_PATH.read_text())
     try:
         jsonschema.validate(instance=manifest, schema=schema)
     except jsonschema.ValidationError as exc:
@@ -65,11 +85,11 @@ def _validate_governance_block(manifest: dict) -> None:
         )
 
 
-def _validate_steps(manifest: dict) -> None:
+def _validate_steps(manifest: dict, registered_agent_ids: set[str]) -> None:
     for step in manifest.get("steps", []):
         agent_id = step.get("agent_id", "")
-        if agent_id not in _VALID_AGENT_IDS:
+        if agent_id not in registered_agent_ids:
             raise ManifestError(
                 f"Step '{step.get('id')}' references unknown agent_id '{agent_id}'. "
-                f"Valid agent IDs: {sorted(_VALID_AGENT_IDS)}"
+                f"Registered agent IDs (from agents/core/): {sorted(registered_agent_ids)}"
             )

@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crystalclear.ai/schemas/agent-manifest/1.0.0",
+  "title": "Agent Manifest Schema",
+  "description": "JSON Schema for all agent manifests in agents/core/. Validated by engine/runtime/validator.py before any orchestrator dispatch.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "name",
+    "role",
+    "description",
+    "owner",
+    "environment",
+    "risk_level",
+    "capabilities",
+    "skills_required",
+    "tool_constraints",
+    "inputs",
+    "outputs",
+    "safety",
+    "logging"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*-agent$",
+      "description": "Canonical agent identifier. Format: {role}-agent using hyphens."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "repo_maintenance",
+        "workflow_executor",
+        "audit_enforcer",
+        "manifest_editor",
+        "report_generator",
+        "multi_agent_conductor"
+      ],
+      "description": "RBAC-style role. Roles are fixed — no agent may change its own role."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "owner": {
+      "type": "string",
+      "description": "Who owns this agent. Must be 'operator' or 'governance'."
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["local", "sandbox", "staging"]
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Explicit list of what this agent can do. Default deny applies to anything not listed."
+    },
+    "skills_required": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Skills this agent depends on to fulfil its role."
+    },
+    "tool_constraints": {
+      "type": "object",
+      "required": ["allowed_tools", "denied_tools"],
+      "description": "Explicit tool allow/deny lists. Non-overlapping is required — the same tool may not appear in both.",
+      "properties": {
+        "allowed_tools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "denied_tools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "allowed_paths": {
+          "type": "object",
+          "properties": {
+            "read": { "type": "array", "items": { "type": "string" } },
+            "write": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Declared input fields with types and descriptions."
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Declared output fields with types and descriptions."
+    },
+    "safety": {
+      "type": "object",
+      "required": ["halt_on_violation"],
+      "properties": {
+        "halt_on_violation": {
+          "type": "boolean",
+          "const": true,
+          "description": "Must always be true. A false value is a governance violation."
+        },
+        "requires_human_approval": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbidden": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit list of forbidden actions. Supplements denied_tools."
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "required": ["log_level", "audit_file"],
+      "properties": {
+        "log_level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"]
+        },
+        "audit_file": {
+          "type": "string",
+          "pattern": "^logs/workflows/",
+          "description": "Must write to logs/workflows/ only."
+        }
+      }
+    }
+  }
+}
