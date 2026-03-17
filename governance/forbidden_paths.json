@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12",
+  "description": "Paths the runtime may never write to. Enforced by _assert_path_allowed() in engine/runtime/path_guard.py. Modifications to this file require manual operator edit only — no agent may alter it.",
+  "version": "1.0.0",
+  "forbidden_write_paths": [
+    "governance",
+    "agents",
+    "manifests/workflows",
+    "manifests/staging",
+    ".git",
+    "skills",
+    "engine"
+  ],
+  "allowed_write_paths": [
+    "reports",
+    "logs/workflows"
+  ]
+}
