@@ -1,0 +1,71 @@
+{
+  "New Atomic Skill": {
+    "prefix": "atomic",
+    "body": [
+      "# ${1:Skill Name} (Atomic Skill)",
+      "",
+      "## Purpose",
+      "${2:Describe the purpose}",
+      "",
+      "## Inputs",
+      "- ${3:input}",
+      "",
+      "## Outputs",
+      "- ${4:output}",
+      "",
+      "## Steps",
+      "1. ${5:step}",
+      "",
+      "## Safety",
+      "- Must not alter user intent",
+      "- Must not introduce new content",
+      "",
+      "## Test Cases",
+      "- Input: ${6:example}",
+      "  Output: ${7:example}"
+    ],
+    "description": "Template for creating a new atomic skill"
+  },
+  "New Molecular Skill": {
+    "prefix": "molecular",
+    "body": [
+      "# ${1:Skill Name} (Molecular Skill)",
+      "",
+      "## Purpose",
+      "${2:Describe the purpose}",
+      "",
+      "## Composed From",
+      "- ${3:atomic-skill-1}",
+      "- ${4:atomic-skill-2}",
+      "",
+      "## Inputs",
+      "- ${5:input}",
+      "",
+      "## Outputs",
+      "- ${6:output}",
+      "",
+      "## Orchestration",
+      "1. ${7:step}",
+      "",
+      "## Safety",
+      "- Must not alter user intent",
+      "- Must validate all atomic outputs"
+    ],
+    "description": "Template for creating a new molecular skill"
+  },
+  "Skill Registry Entry": {
+    "prefix": "registry-entry",
+    "body": [
+      "{",
+      "  \"id\": \"${1:skill-id}\",",
+      "  \"name\": \"${2:Skill Name}\",",
+      "  \"type\": \"${3|atomic,molecular,system|}\",",
+      "  \"version\": \"${4:1.0.0}\",",
+      "  \"status\": \"${5|draft,active,deprecated|}\",",
+      "  \"description\": \"${6:Brief description}\",",
+      "  \"path\": \"${7:skills/atomic/skill-id.md}\"",
+      "}"
+    ],
+    "description": "Template for a skill registry JSON entry"
+  }
+}
