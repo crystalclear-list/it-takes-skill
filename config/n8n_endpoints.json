@@ -21,7 +21,7 @@
         "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
       ],
       "description": "Triggers TikTok repost workflow for Account B (@the-steele-zone repost account). Fires twice daily from post_schedule.csv AM + PM rows where platform=tiktok_repost.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -33,7 +33,7 @@
         "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
       ],
       "description": "Posts video to Instagram Reels (@thesteelezone). Mirrors TikTok AM video with 1-day lag. Fires once daily from post_schedule.csv rows where platform=ig_reel.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -45,7 +45,7 @@
         "link_url", "scheduled_date", "n8n_run_id"
       ],
       "description": "Posts weekly IG Story teaser (blurred frame, PPV tease, DM CTA, etc.). story_type must be one of: new_drop | poll | countdown | dm_cta | bts.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -57,7 +57,7 @@
         "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
       ],
       "description": "Posts video to X (@thesteelezone). Direct OF link allowed. Fires once daily from post_schedule.csv rows where platform=x.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -69,7 +69,7 @@
         "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
       ],
       "description": "Posts video to Facebook Page (THESTEELEZONE). Fires Mon/Wed/Fri/Sat from post_schedule.csv rows where platform=facebook. No direct OF link — linkfly only.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -81,7 +81,7 @@
         "tease_line", "hashtag_set_id", "link_url", "n8n_run_id"
       ],
       "description": "Renders a caption by filling {{hook_line}} and {{tease_line}} into the named template. Returns caption_rendered string. Called before any content__ post endpoint.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": false
     },
 
@@ -90,7 +90,7 @@
       "auth_env_var": "N8N_WEBHOOK_TOKEN_OF_NURTURE",
       "allowed_payload_keys": ["sequence_id", "trigger_reason", "n8n_run_id"],
       "description": "Triggers an OnlyFans nurture sequence by sequence ID. No subscriber PII in payload — IDs only.",
-      "category": "content",
+      "category": "content_automation",
       "requires_audit_pre_check": true
     },
 
@@ -101,7 +101,7 @@
         "days", "start_date", "trigger_reason", "n8n_run_id"
       ],
       "description": "Triggers n8n to regenerate the rolling post schedule. Calls scripts/build_schedule.py output or replicates its logic. Operator-initiated only.",
-      "category": "infra",
+      "category": "infra_sensitive",
       "requires_audit_pre_check": true
     },
 
@@ -112,7 +112,7 @@
         "video_id", "platform", "trigger_reason", "n8n_run_id"
       ],
       "description": "Queries post history to check if video_id was posted on platform within the last 60 days. Returns allowed: true|false. Must be called before any content dispatch.",
-      "category": "infra",
+      "category": "infra_sensitive",
       "requires_audit_pre_check": false
     },
 
