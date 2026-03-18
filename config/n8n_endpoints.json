@@ -1,45 +1,128 @@
 {
-  "schema_version": "1.0",
-  "_comment": "Approved n8n endpoint allowlist. No secrets — only env var names. All values enforced by audit_n8n_payload.py before dispatch. This file is a forbidden write path at runtime (governance/forbidden_paths.json). Changes require a human commit and CI pass.",
+  "schema_version": "1.1",
+  "_comment": "Approved n8n endpoint allowlist. No secrets — only env var names. All values enforced by audit_n8n_payload.py before dispatch. This file is a forbidden write path at runtime (governance/forbidden_paths.json). Changes require a human commit and CI pass. Any new payload field must be added to allowed_payload_keys here before it can be used by workflows.",
 
   "global_constraints": {
     "allowed_scheme": "https",
     "allowed_method": "POST",
-    "allowed_host": "YOUR_N8N_HOST",
+    "allowed_host": "dispensible-jovanni-faddiest.ngrok-free.dev",
     "max_payload_bytes": 4096,
-    "request_timeout_seconds": 30
+    "request_timeout_seconds": 30,
+    "_host_note": "ngrok-free.dev URL — update this and all endpoint URLs if the ngrok domain changes."
   },
 
   "endpoints": {
+
     "content__tiktok_repost_daily": {
-      "url": "https://YOUR_N8N_HOST/webhook/tiktok-repost-daily",
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/tiktok-repost-daily",
       "auth_env_var": "N8N_WEBHOOK_TOKEN_TIKTOK",
-      "allowed_payload_keys": ["video_id", "caption", "schedule_slot"],
-      "description": "Triggers daily TikTok repost workflow. Accepts a single video ID, optional caption override, and optional schedule slot.",
-      "category": "content_automation",
-      "requires_audit_pre_check": false
-    },
-    "content__ig_crosspost": {
-      "url": "https://YOUR_N8N_HOST/webhook/ig-crosspost",
-      "auth_env_var": "N8N_WEBHOOK_TOKEN_IG",
-      "allowed_payload_keys": ["video_id", "caption", "platforms"],
-      "description": "Cross-posts video to Instagram Reels. Platforms field is a list constrained to ['instagram'].",
-      "category": "content_automation",
-      "requires_audit_pre_check": false
-    },
-    "content__of_nurture_sequence": {
-      "url": "https://YOUR_N8N_HOST/webhook/of-nurture",
-      "auth_env_var": "N8N_WEBHOOK_TOKEN_OF_NURTURE",
-      "allowed_payload_keys": ["sequence_id", "trigger_reason"],
-      "description": "Triggers an OnlyFans nurture sequence by sequence ID. No subscriber PII in payload — IDs only.",
-      "category": "content_automation",
+      "allowed_payload_keys": [
+        "post_id", "video_id", "platform", "caption_rendered",
+        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
+      ],
+      "description": "Triggers TikTok repost workflow for Account B (@the-steele-zone repost account). Fires twice daily from post_schedule.csv AM + PM rows where platform=tiktok_repost.",
+      "category": "content",
       "requires_audit_pre_check": true
     },
-    "reporting__weekly_revenue_summary": {
-      "url": "https://YOUR_N8N_HOST/webhook/weekly-revenue-summary",
+
+    "content__ig_reel_post": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/ig-reel-post",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_IG",
+      "allowed_payload_keys": [
+        "post_id", "video_id", "platform", "caption_rendered",
+        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
+      ],
+      "description": "Posts video to Instagram Reels (@thesteelezone). Mirrors TikTok AM video with 1-day lag. Fires once daily from post_schedule.csv rows where platform=ig_reel.",
+      "category": "content",
+      "requires_audit_pre_check": true
+    },
+
+    "content__ig_story_post": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/ig-story-post",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_IG",
+      "allowed_payload_keys": [
+        "post_id", "story_type", "caption_rendered",
+        "link_url", "scheduled_date", "n8n_run_id"
+      ],
+      "description": "Posts weekly IG Story teaser (blurred frame, PPV tease, DM CTA, etc.). story_type must be one of: new_drop | poll | countdown | dm_cta | bts.",
+      "category": "content",
+      "requires_audit_pre_check": true
+    },
+
+    "content__x_post": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/x-post",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_X",
+      "allowed_payload_keys": [
+        "post_id", "video_id", "platform", "caption_rendered",
+        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
+      ],
+      "description": "Posts video to X (@thesteelezone). Direct OF link allowed. Fires once daily from post_schedule.csv rows where platform=x.",
+      "category": "content",
+      "requires_audit_pre_check": true
+    },
+
+    "content__facebook_post": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/facebook-post",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_FACEBOOK",
+      "allowed_payload_keys": [
+        "post_id", "video_id", "platform", "caption_rendered",
+        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
+      ],
+      "description": "Posts video to Facebook Page (THESTEELEZONE). Fires Mon/Wed/Fri/Sat from post_schedule.csv rows where platform=facebook. No direct OF link — linkfly only.",
+      "category": "content",
+      "requires_audit_pre_check": true
+    },
+
+    "content__caption_render": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/caption-render",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_CAPTION",
+      "allowed_payload_keys": [
+        "post_id", "caption_template_id", "hook_line",
+        "tease_line", "hashtag_set_id", "link_url", "n8n_run_id"
+      ],
+      "description": "Renders a caption by filling {{hook_line}} and {{tease_line}} into the named template. Returns caption_rendered string. Called before any content__ post endpoint.",
+      "category": "content",
+      "requires_audit_pre_check": false
+    },
+
+    "content__of_nurture_sequence": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/of-nurture",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_OF_NURTURE",
+      "allowed_payload_keys": ["sequence_id", "trigger_reason", "n8n_run_id"],
+      "description": "Triggers an OnlyFans nurture sequence by sequence ID. No subscriber PII in payload — IDs only.",
+      "category": "content",
+      "requires_audit_pre_check": true
+    },
+
+    "infra__schedule_builder": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/schedule-builder",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_INFRA",
+      "allowed_payload_keys": [
+        "days", "start_date", "trigger_reason", "n8n_run_id"
+      ],
+      "description": "Triggers n8n to regenerate the rolling post schedule. Calls scripts/build_schedule.py output or replicates its logic. Operator-initiated only.",
+      "category": "infra",
+      "requires_audit_pre_check": true
+    },
+
+    "infra__60day_repeat_guard": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/repeat-guard",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_INFRA",
+      "allowed_payload_keys": [
+        "video_id", "platform", "trigger_reason", "n8n_run_id"
+      ],
+      "description": "Queries post history to check if video_id was posted on platform within the last 60 days. Returns allowed: true|false. Must be called before any content dispatch.",
+      "category": "infra",
+      "requires_audit_pre_check": false
+    },
+
+    "reporting__weekly_summary": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/weekly-summary",
       "auth_env_var": "N8N_WEBHOOK_TOKEN_REPORTING",
-      "allowed_payload_keys": ["report_period", "trigger_reason"],
-      "description": "Triggers weekly revenue summary generation in n8n. Output is a report, not a financial action.",
+      "allowed_payload_keys": [
+        "report_period", "trigger_reason", "n8n_run_id"
+      ],
+      "description": "Generates weekly summary: posts completed, failed, skipped, platform breakdown. Writes to reports/. No PII, no financial data.",
       "category": "reporting",
       "requires_audit_pre_check": false
     }
