@@ -36,7 +36,10 @@ class TestGovernanceHealthCheck:
 # ── manifest_validator ───────────────────────────────────────────────────────
 
 # These are the manifests we know should always pass.
-_EXPECTED_VALID = {"manifest_validator", "governance_health_check", "agent_validator", "n8n_dispatch_basic"}
+_EXPECTED_VALID = {
+    "manifest_validator", "governance_health_check", "agent_validator", "n8n_dispatch_basic",
+    "content_automation_deploy", "tiktok_repost_skill", "content_calendar_skill",
+}
 
 # bad_actor_workflow is a permanent known-bad fixture — it MUST always appear here.
 _EXPECTED_INVALID = {"bad_actor_workflow"}
@@ -189,3 +192,135 @@ class TestContentAutomationDeployManifest:
             "content_automation_deploy must require human approval for promotion. "
             f"human_approval_required_for: {approvals}"
         )
+
+
+# ── tiktok_repost_skill staging manifest ─────────────────────────────────────
+
+class TestTikTokRepostSkillManifest:
+    """Assertions for the tiktok_repost_skill staging proposal."""
+
+    _PATH = Path("manifests/staging/tiktok_repost_skill.json")
+
+    def _manifest(self):
+        return json.loads(self._PATH.read_text())
+
+    def test_manifest_exists(self):
+        assert self._PATH.exists()
+
+    def test_halt_on_violation_true(self):
+        assert self._manifest()["governance_requirements"]["halt_on_violation"] is True
+
+    def test_governance_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("governance"), (
+                f"tiktok_repost_skill allows writing to governance/: '{path}'"
+            )
+
+    def test_config_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("config"), (
+                f"tiktok_repost_skill allows writing to config/: '{path}'"
+            )
+
+    def test_production_manifests_in_forbidden_write_paths(self):
+        forbidden = self._manifest()["staging_requirements"]["forbidden_write_paths"]
+        assert "manifests/workflows/" in forbidden, (
+            "tiktok_repost_skill must forbid writes to manifests/workflows/"
+        )
+
+    def test_human_approval_required_for_review_gate(self):
+        approvals = self._manifest()["governance_requirements"].get(
+            "human_approval_required_for", []
+        )
+        assert any("review" in a or "gate" in a or "approval" in a for a in approvals), (
+            "tiktok_repost_skill must require a human review gate "
+            f"(daily_review_gate_steelezone or similar). Got: {approvals}"
+        )
+
+    def test_dispatch_step_uses_only_http_post_n8n(self):
+        """The workflow_executor dispatch step must allow http_post_n8n and deny network_calls."""
+        steps = self._manifest()["steps"]
+        # Find the workflow_executor step that actually dispatches (not the audit step)
+        dispatch = next(
+            (s for s in steps if s.get("agent_role") == "workflow_executor"),
+            None,
+        )
+        assert dispatch is not None, (
+            "No workflow_executor step found in tiktok_repost_skill"
+        )
+        allowed = dispatch["constraints"].get("allowed_tools", [])
+        forbidden = dispatch["constraints"].get("forbidden_tools", [])
+        assert "http_post_n8n" in allowed, (
+            f"workflow_executor step '{dispatch['id']}' must allow http_post_n8n"
+        )
+        assert "network_calls" in forbidden, (
+            f"workflow_executor step '{dispatch['id']}' must explicitly deny network_calls "
+            "(http_post_n8n is the only permitted outbound tool)"
+        )
+
+    def test_manifest_passes_schema_validation(self):
+        from engine.runtime.manifest.validator import validate_manifest
+        validate_manifest(self._manifest())  # must not raise
+
+
+# ── content_calendar_skill staging manifest ───────────────────────────────────
+
+class TestContentCalendarSkillManifest:
+    """Assertions for the content_calendar_skill staging proposal."""
+
+    _PATH = Path("manifests/staging/content_calendar_skill.json")
+
+    def _manifest(self):
+        return json.loads(self._PATH.read_text())
+
+    def test_manifest_exists(self):
+        assert self._PATH.exists()
+
+    def test_halt_on_violation_true(self):
+        assert self._manifest()["governance_requirements"]["halt_on_violation"] is True
+
+    def test_staging_only_manifest_writes(self):
+        assert self._manifest()["governance_requirements"].get("staging_only_manifest_writes") is True
+
+    def test_governance_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("governance"), (
+                f"content_calendar_skill allows writing to governance/: '{path}'"
+            )
+
+    def test_config_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("config"), (
+                f"content_calendar_skill allows writing to config/: '{path}'"
+            )
+
+    def test_production_manifests_in_forbidden_write_paths(self):
+        forbidden = self._manifest()["staging_requirements"]["forbidden_write_paths"]
+        assert "manifests/workflows/" in forbidden, (
+            "content_calendar_skill must forbid writes to manifests/workflows/"
+        )
+
+    def test_human_approval_required_for_dispatch(self):
+        approvals = self._manifest()["governance_requirements"].get(
+            "human_approval_required_for", []
+        )
+        assert any("dispatch" in a or "calendar" in a for a in approvals), (
+            "content_calendar_skill must require human approval for calendar dispatch. "
+            f"Got: {approvals}"
+        )
+
+    def test_no_direct_http_calls_outside_dispatch_step(self):
+        """Only the dispatch step may use http_post_n8n; all other steps must forbid it."""
+        steps = self._manifest()["steps"]
+        for step in steps:
+            allowed = step.get("constraints", {}).get("allowed_tools", [])
+            step_id = step["id"]
+            # Content calendar has no direct dispatch step (proposals only) — no step should use http_post_n8n
+            assert "http_post_n8n" not in allowed, (
+                f"Step '{step_id}' in content_calendar_skill allows http_post_n8n. "
+                "This workflow generates proposals only — dispatch happens after operator promotion."
+            )
+
+    def test_manifest_passes_schema_validation(self):
+        from engine.runtime.manifest.validator import validate_manifest
+        validate_manifest(self._manifest())  # must not raise

@@ -116,6 +116,18 @@
       "requires_audit_pre_check": false
     },
 
+    "content__calendar_dispatch_daily": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/calendar-dispatch-daily",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_CALENDAR",
+      "allowed_payload_keys": [
+        "date", "brand", "platform", "post_id", "caption_rendered",
+        "hashtag_set_id", "link_url", "trigger_reason", "n8n_run_id", "time_slot"
+      ],
+      "description": "Triggers the daily calendar-driven dispatch workflow for both brands. brand must be one of: steelezone | discobass. DiscoBass: DJ mix clips, BTS, event promos — rate-limited via n8n Delay/Cron nodes. SteeleZone: routed through content__tiktok_repost_daily audit path; adult-content daily review gate applies.",
+      "category": "content_automation",
+      "requires_audit_pre_check": true
+    },
+
     "reporting__weekly_summary": {
       "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/weekly-summary",
       "auth_env_var": "N8N_WEBHOOK_TOKEN_REPORTING",

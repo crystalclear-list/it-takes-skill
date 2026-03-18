@@ -258,3 +258,74 @@ class TestEndpointHygienePhase1:
                 assert excl not in cat, (
                     f"Endpoint '{name}' category '{cat}' matches excluded category '{excl}'"
                 )
+
+
+# ── Phase 2 endpoint assertions ───────────────────────────────────────────────
+
+class TestPhase2Endpoints:
+    """Specific assertions for TikTok repost and content calendar endpoints."""
+
+    def _config(self):
+        return json.loads(Path("config/n8n_endpoints.json").read_text())
+
+    # ── TikTok repost ─────────────────────────────────────────────────────────
+
+    def test_tiktok_repost_endpoint_exists(self):
+        assert "content__tiktok_repost_daily" in self._config()["endpoints"]
+
+    def test_tiktok_repost_requires_audit_pre_check(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert ep.get("requires_audit_pre_check") is True
+
+    def test_tiktok_repost_category_is_content_automation(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert ep["category"] == "content_automation"
+
+    def test_tiktok_repost_has_video_id_in_payload_keys(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert "video_id" in ep["allowed_payload_keys"]
+
+    def test_tiktok_repost_url_is_https(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert ep["url"].startswith("https://")
+
+    # ── Content calendar ──────────────────────────────────────────────────────
+
+    def test_calendar_dispatch_endpoint_exists(self):
+        assert "content__calendar_dispatch_daily" in self._config()["endpoints"]
+
+    def test_calendar_dispatch_requires_audit_pre_check(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        assert ep.get("requires_audit_pre_check") is True
+
+    def test_calendar_dispatch_category_is_content_automation(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        assert ep["category"] == "content_automation"
+
+    def test_calendar_dispatch_has_required_payload_keys(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        required = {"date", "brand", "platform", "post_id", "trigger_reason"}
+        missing = required - set(ep["allowed_payload_keys"])
+        assert not missing, (
+            f"content__calendar_dispatch_daily is missing payload keys: {missing}"
+        )
+
+    def test_calendar_dispatch_url_is_https(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        assert ep["url"].startswith("https://")
+
+    def test_calendar_dispatch_url_on_approved_host(self):
+        cfg = self._config()
+        allowed_host = cfg["global_constraints"]["allowed_host"]
+        ep = cfg["endpoints"]["content__calendar_dispatch_daily"]
+        assert allowed_host in ep["url"], (
+            f"content__calendar_dispatch_daily URL must contain approved host '{allowed_host}'"
+        )
+
+    def test_calendar_dispatch_has_auth_env_var(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        env_var = ep.get("auth_env_var", "")
+        assert env_var, "content__calendar_dispatch_daily is missing auth_env_var"
+        assert env_var.isupper() or "_" in env_var, (
+            f"auth_env_var '{env_var}' looks like a value, not a variable name"
+        )
