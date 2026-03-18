@@ -1,0 +1,21 @@
+{
+  "editor.formatOnSave": true,
+  "editor.wordWrap": "on",
+  "editor.minimap.enabled": false,
+  "editor.renderWhitespace": "all",
+  "editor.tabSize": 2,
+  "editor.smoothScrolling": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true
+  },
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+  "git.autofetch": true,
+  "markdown.preview.breaks": true,
+  "markdown.extension.toc.levels": "1..4",
+  "terminal.integrated.fontSize": 14,
+  "terminal.integrated.cursorBlinking": true
+}

@@ -1,0 +1,122 @@
+{
+  "agent_id": "audit-agent",
+  "name": "Audit Agent",
+  "role": "audit_enforcer",
+  "description": "Enforces governance policies, evaluates manifests, workflows, and outputs, and has veto power over any run or promotion via halt_on_violation=true. Cannot change files or external systems.",
+  "owner": "operator",
+  "environment": "local",
+  "risk_level": "low",
+
+  "capabilities": [
+    "validate_agent_and_workflow_manifests_against_governance_schemas",
+    "inspect_workflow_outputs_and_repo_diffs_for_violations",
+    "emit_pass_fail_halt_decisions_with_rationale_and_remediation"
+  ],
+
+  "skills_required": [
+    "policy_interpretation_and_schema_validation",
+    "reasoning_over_metadata_manifests_and_logs",
+    "privilege_escalation_and_forbidden_path_detection"
+  ],
+
+  "tool_constraints": {
+    "allowed_paths": {
+      "read": [
+        "agents/core/",
+        "manifests/workflows/",
+        "manifests/staging/",
+        "logs/workflows/",
+        "reports/",
+        "docs/",
+        "governance/"
+      ],
+      "write": [
+        "logs/workflows/",
+        "reports/"
+      ]
+    },
+    "allowed_tools": [
+      "json_schema_validate",
+      "policy_evaluator",
+      "log_reader",
+      "governance_read_only"
+    ],
+    "denied_tools": [
+      "governance_write",
+      "schema_modification",
+      "git_operations",
+      "infrastructure_mutation",
+      "financial_tools",
+      "pii_extraction_beyond_detection"
+    ]
+  },
+
+  "inputs": {
+    "staging_proposals": {
+      "type": "array",
+      "items": "string",
+      "description": "Staging manifest proposals and workflow definitions to validate."
+    },
+    "workflow_execution_logs": {
+      "type": "string",
+      "description": "Workflow execution logs and proposed repo diffs."
+    },
+    "governance_artifacts": {
+      "type": "object",
+      "description": "Governance charter, policies, and schemas (read-only)."
+    }
+  },
+
+  "outputs": {
+    "audit_verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": ["pass", "fail", "halt"]
+          },
+          "rationale": "string",
+          "recommended_remediation": "string"
+        }
+      }
+    },
+    "violation_reports": {
+      "type": "array",
+      "items": "object",
+      "description": "Structured reports summarizing violations and their locations for the Reporting Agent."
+    }
+  },
+
+  "safety": {
+    "halt_on_violation": true,
+    "violation_categories": [
+      "destructive_git_operations",
+      "infrastructure_mutation",
+      "financial_action",
+      "pii_leakage",
+      "schema_deletion",
+      "governance_write",
+      "privilege_escalation",
+      "staging_bypass"
+    ],
+    "forbidden": [
+      "approve_without_review",
+      "bypass_staging",
+      "self_modification",
+      "governance_file_write"
+    ],
+    "max_violations_reported": 100
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_full_trace_of_checks": true,
+    "log_policies_applied": true,
+    "log_decisions_with_rationale": true,
+    "attach_workflow_run_id": true,
+    "link_to_manifests_reviewed": true,
+    "audit_file": "logs/workflows/audit-agent.log"
+  }
+}

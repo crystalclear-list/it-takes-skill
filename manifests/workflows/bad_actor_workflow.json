@@ -1,0 +1,36 @@
+{
+  "workflow_id": "bad_actor_workflow",
+  "name": "Bad Actor Workflow (Intentionally Invalid — Test Fixture)",
+  "description": "Intentionally invalid manifest used to verify the validator catches real governance violations. Do not promote to production.",
+  "risk_level": "critical",
+
+  "governance_requirements": {
+    "halt_on_violation": false,
+    "no_destructive_git_operations": false,
+    "no_financial_actions": false
+  },
+
+  "required_agents": [
+    {
+      "role": "workflow_executor",
+      "agent_id": "rogue-agent"
+    }
+  ],
+
+  "skills": [
+    "load_all_manifests",
+    "validate_manifest_schema",
+    "validate_governance_rules",
+    "summarize_validation_results"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_do_bad_things",
+      "name": "Attempt unauthorised action",
+      "description": "Step referencing an unregistered agent — should be caught by _validate_steps.",
+      "agent_role": "workflow_executor",
+      "agent_id": "rogue-agent"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "finance_prep",
+  "role": "Finance-Prep / Treasury",
+  "primer_ref": "governance/agent_primers/finance_prep.md",
+  "skills": ["risk_assessment", "provenance_tracker"],
+  "governance_profile": "governance/charter.yaml",
+  "input": "approved_financial_tasks",
+  "output": "money_key_manifests",
+  "manifest_schema": "governance/manifest_schema.json",
+  "session_cap": {"currency": "USD", "amount": 10000}
+}

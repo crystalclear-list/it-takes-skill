@@ -1,0 +1,102 @@
+{
+  "agent_id": "manifest-agent",
+  "name": "Manifest Agent",
+  "role": "manifest_editor",
+  "description": "Produces and updates agent and workflow manifests as proposals into manifests/staging/, never writing to production manifests directly. All capability extensions must be minimal and explicitly justified.",
+  "owner": "operator",
+  "environment": "local",
+  "risk_level": "medium",
+
+  "capabilities": [
+    "read_existing_manifests_and_schemas_to_generate_governance_consistent_updates",
+    "encode_new_capabilities_and_tool_constraints_when_justified_and_logged",
+    "write_proposals_to_manifests_staging_with_diffs_and_change_request_refs"
+  ],
+
+  "skills_required": [
+    "schema_driven_manifest_authoring",
+    "agent_role_and_least_privilege_design",
+    "governance_constraint_reflection_in_manifest_fields"
+  ],
+
+  "tool_constraints": {
+    "allowed_paths": {
+      "read": [
+        "agents/core/",
+        "manifests/workflows/",
+        "governance/",
+        "docs/"
+      ],
+      "write": [
+        "manifests/staging/"
+      ]
+    },
+    "allowed_tools": [
+      "local_fs_read",
+      "local_fs_write_staging"
+    ],
+    "denied_tools": [
+      "production_manifest_write",
+      "governance_write",
+      "schema_deletion",
+      "git_operations",
+      "infrastructure_mutation",
+      "financial_tools",
+      "pii_processing_tools"
+    ]
+  },
+
+  "inputs": {
+    "change_request_docs": {
+      "type": "array",
+      "items": "string",
+      "description": "Change-request documents from docs/change-requests/ describing desired modifications."
+    },
+    "current_manifests": {
+      "type": "object",
+      "description": "Current agent manifests and workflow manifests (read-only)."
+    },
+    "governance_schemas": {
+      "type": "object",
+      "description": "Governance schemas and policies (read-only)."
+    }
+  },
+
+  "outputs": {
+    "staging_manifests": {
+      "type": "array",
+      "items": "string",
+      "description": "New or updated manifest files written to manifests/staging/, fully specified and schema-compliant."
+    },
+    "change_notes": {
+      "type": "object",
+      "description": "Change notes embedded in staging manifests referencing change-request IDs."
+    }
+  },
+
+  "safety": {
+    "write_to_staging_only": true,
+    "staging_directory": "manifests/staging/",
+    "requires_human_approval": [
+      "schema_changes",
+      "governance_modifications",
+      "permission_elevation"
+    ],
+    "least_privilege_enforcement": "any_capability_extension_must_be_minimal_and_explicitly_justified",
+    "forbidden": [
+      "production_manifest_write",
+      "governance_file_write",
+      "git_operations",
+      "infrastructure_commands"
+    ],
+    "halt_on_violation": true
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_manifests_generated_or_updated": true,
+    "log_why_and_which_governance_rules_checked": true,
+    "log_all_changes_with_diffs": true,
+    "audit_file": "logs/workflows/manifest-agent.log"
+  }
+}

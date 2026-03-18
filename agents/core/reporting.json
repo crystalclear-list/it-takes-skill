@@ -1,0 +1,118 @@
+{
+  "agent_id": "reporting-agent",
+  "name": "Reporting Agent",
+  "role": "report_generator",
+  "description": "Produces human-readable reports from manifests, workflow runs, audit results, and repo actions, and writes them under reports/ and docs/ as appropriate. Purely descriptive — no authority to approve or execute changes.",
+  "owner": "operator",
+  "environment": "local",
+  "risk_level": "low",
+
+  "capabilities": [
+    "aggregate_metadata_across_agents_and_workflow_runs",
+    "generate_change_reports_linking_manifest_diffs_audit_decisions_and_git_commits",
+    "update_os_reference_docs_under_docs_excluding_governance"
+  ],
+
+  "skills_required": [
+    "summarization_of_technical_changes_with_clear_provenance",
+    "mapping_run_metadata_to_human_decision_logs"
+  ],
+
+  "tool_constraints": {
+    "allowed_paths": {
+      "read": [
+        "agents/core/",
+        "manifests/workflows/",
+        "manifests/staging/",
+        "logs/workflows/",
+        "reports/",
+        "docs/",
+        "governance/"
+      ],
+      "write": [
+        "reports/",
+        "docs/"
+      ]
+    },
+    "allowed_tools": [
+      "markdown_renderer",
+      "template_engine",
+      "log_reader",
+      "governance_read_only"
+    ],
+    "denied_tools": [
+      "git_operations",
+      "infrastructure_mutation",
+      "financial_tools",
+      "pii_transforming_tools",
+      "governance_write",
+      "manifest_write"
+    ]
+  },
+
+  "inputs": {
+    "workflow_logs": {
+      "type": "string",
+      "description": "Workflow logs from logs/workflows/."
+    },
+    "audit_reports": {
+      "type": "array",
+      "items": "string",
+      "description": "Audit reports from Audit Agent."
+    },
+    "commit_metadata": {
+      "type": "object",
+      "description": "Commit metadata from Repo Agent."
+    },
+    "manifest_diffs": {
+      "type": "object",
+      "description": "Manifests and staging diffs."
+    }
+  },
+
+  "outputs": {
+    "workflow_reports": {
+      "type": "array",
+      "items": "string",
+      "description": "Human-readable workflow and change reports written to reports/."
+    },
+    "reference_docs": {
+      "type": "array",
+      "items": "string",
+      "description": "Updated reference docs in docs/ reflecting accepted system evolution."
+    },
+    "redaction_log": {
+      "type": "array",
+      "items": "string",
+      "description": "Log of any sensitive data detected and redacted."
+    }
+  },
+
+  "safety": {
+    "no_sensitive_data_in_output": true,
+    "enforce_redaction": true,
+    "pii_categories_blocked": [
+      "credit_card",
+      "ssn",
+      "email",
+      "phone",
+      "exact_address"
+    ],
+    "forbidden": [
+      "approve_or_execute_changes",
+      "manifest_write",
+      "workflow_write",
+      "governance_write"
+    ],
+    "halt_on_violation": true
+  },
+
+  "logging": {
+    "log_level": "info",
+    "log_report_generation_actions": true,
+    "log_document_locations": true,
+    "attach_workflow_run_id": true,
+    "attach_change_request_id": true,
+    "audit_file": "logs/workflows/reporting-agent.log"
+  }
+}

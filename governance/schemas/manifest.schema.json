@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crystalclear.ai/schemas/workflow-manifest/1.0.0",
+  "title": "Workflow Manifest Schema",
+  "description": "JSON Schema for all workflow manifests in manifests/workflows/. Validated by engine/runtime/validator.py before any execution. Closes gap documented in CR-2026-03-001.",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["workflow_id", "name", "description", "risk_level", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "workflow_id": {
+      "type": "string",
+      "description": "Unique identifier for this workflow. Used as the manifest filename.",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable workflow name.",
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "description": "What this workflow does and why.",
+      "maxLength": 500
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Risk classification for this workflow."
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Declared input fields with types and descriptions.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "enum": { "type": "array" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Declared output fields with types and descriptions.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "required_agents": {
+      "type": "array",
+      "description": "Agent roles and IDs required by this workflow.",
+      "items": {
+        "type": "object",
+        "required": ["role", "agent_id"],
+        "properties": {
+          "role": { "type": "string" },
+          "agent_id": { "type": "string" }
+        }
+      }
+    },
+    "governance_requirements": {
+      "type": "object",
+      "description": "Governance constraints that must be honoured during execution.",
+      "properties": {
+        "halt_on_violation": {
+          "type": "boolean",
+          "const": true,
+          "description": "Must always be true. A false value is a governance violation."
+        },
+        "no_destructive_git_operations": { "type": "boolean" },
+        "no_infrastructure_mutation": { "type": "boolean" },
+        "no_financial_actions": { "type": "boolean" },
+        "no_pii_leakage": { "type": "boolean" },
+        "no_schema_deletion": { "type": "boolean" },
+        "no_governance_modification": { "type": "boolean" },
+        "staging_only_manifest_writes": { "type": "boolean" },
+        "human_approval_required_for": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "staging_requirements": {
+      "type": "object",
+      "properties": {
+        "allowed_write_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbidden_write_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "enforce_staging_only": { "type": "boolean" }
+      }
+    },
+    "audit_requirements": {
+      "type": "object",
+      "properties": {
+        "enforce_audit_agent": { "type": "boolean" },
+        "audit_role": { "type": "string" },
+        "halt_on_violation": { "type": "boolean" },
+        "log_provenance": { "type": "boolean" },
+        "audit_log_path": { "type": "string" },
+        "required_checks": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of execution steps. Must contain at least one step.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "agent_role", "agent_id"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^step_[0-9]+_[a-z_]+$",
+            "description": "Step identifier. Format: step_{n}_{slug}"
+          },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "agent_role": {
+            "type": "string",
+            "enum": [
+              "workflow_executor",
+              "audit_enforcer",
+              "report_generator",
+              "repo_maintenance",
+              "manifest_editor",
+              "multi_agent_conductor"
+            ]
+          },
+          "agent_id": {
+            "type": "string",
+            "enum": [
+              "workflow-agent",
+              "audit-agent",
+              "reporting-agent",
+              "repo-agent",
+              "manifest-agent",
+              "orchestrator-agent"
+            ]
+          },
+          "skill": {
+            "type": "string",
+            "description": "Name of the skill .md file to load (without extension). Optional — steps without a skill pass context through."
+          },
+          "inputs": { "type": "object" },
+          "outputs": { "type": "object" },
+          "constraints": {
+            "type": "object",
+            "properties": {
+              "allowed_tools": { "type": "array", "items": { "type": "string" } },
+              "allowed_paths": { "type": "array", "items": { "type": "string" } },
+              "forbidden_tools": { "type": "array", "items": { "type": "string" } },
+              "forbidden_paths": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "safety": {
+            "type": "object",
+            "properties": {
+              "halt_on_violation": { "type": "boolean" },
+              "no_writes": { "type": "boolean" },
+              "requires_human_approval": { "type": "array", "items": { "type": "string" } },
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "description": "Ordered list of Python skill module names to execute sequentially. Each name maps to skills/<name>.py exposing run(data: dict) -> dict.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "provenance": { "type": "boolean" },
+        "log_workflow_start_and_end": { "type": "boolean" },
+        "log_each_step_boundary": { "type": "boolean" },
+        "workflow_log_path": { "type": "string" }
+      }
+    }
+  }
+}

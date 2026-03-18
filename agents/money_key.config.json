@@ -1,0 +1,10 @@
+{
+  "name": "money_key",
+  "role": "Human Execution Gate",
+  "primer_ref": "governance/agent_primers/money_key.md",
+  "mode": "human_only",
+  "is_ai_agent": false,
+  "input": "money_key_manifests",
+  "output": "execution_logs",
+  "manifest_schema": "governance/manifest_schema.json"
+}

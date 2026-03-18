@@ -1,0 +1,23 @@
+{
+  "recommendations": [
+    "github.copilot",
+    "github.copilot-chat",
+    "github.vscode-pull-request-github",
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "yzhang.markdown-all-in-one",
+    "shd101wyy.markdown-preview-enhanced",
+    "mushan.vscode-paste-image",
+    "eriklynd.json-tools",
+    "redhat.vscode-yaml",
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "christian-kohler.path-intellisense",
+    "gruntfuggly.todo-tree",
+    "humao.rest-client",
+    "hediet.vscode-drawio",
+    "rangav.vscode-thunder-client"
+  ]
+}

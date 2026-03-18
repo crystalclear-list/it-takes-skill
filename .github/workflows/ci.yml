@@ -1,0 +1,90 @@
+name: Skill OS CI
+
+on:
+  push:
+    branches: [foundation, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests + Governance Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: pip install pytest jsonschema
+
+      - name: Run full test suite
+        run: python -m pytest tests/ -v --tb=short
+
+      # Explicit named steps so the Actions summary pinpoints which check failed.
+
+      - name: Governance health check (constitution must be intact)
+        run: |
+          python - <<'EOF'
+          from engine.runtime import run
+          result = run("governance_health_check", input_data={"trigger_reason": "ci"})
+          missing = result["result"]["missing_files"]
+          if missing:
+              print("FAIL — missing governance files:", missing)
+              raise SystemExit(1)
+          print("PASS — all governance files present:", result["result"]["present_files"])
+          EOF
+
+      - name: Agent manifest validator (all core agents must pass schema)
+        run: |
+          python - <<'EOF'
+          from engine.runtime import run
+          result  = run("agent_validator", input_data={"trigger_reason": "ci"})
+          failed  = result["result"]["failed_manifests"]
+          summary = result["result"]["summary"]
+          if failed:
+              print("FAIL — agent manifests failed schema validation:", failed)
+              raise SystemExit(1)
+          print(f"PASS — all {summary['total_manifests']} agent manifests valid")
+          EOF
+
+      - name: Manifest validator (known-good pass, known-bad fail)
+        run: |
+          python - <<'EOF'
+          from engine.runtime import run
+
+          EXPECTED_VALID   = {"manifest_validator", "governance_health_check", "agent_validator"}
+          EXPECTED_INVALID = {"bad_actor_workflow"}
+
+          result  = run("manifest_validator", input_data={"target_scope": "all", "trigger_reason": "ci"})
+          summary = result["result"]["summary"]
+          valid   = set(summary["valid_manifests"])
+          invalid = set(summary["invalid_manifests"])
+
+          failed = False
+
+          missing_valid = EXPECTED_VALID - valid
+          if missing_valid:
+              print("FAIL — known-good manifests did not pass:", missing_valid)
+              failed = True
+
+          missing_invalid = EXPECTED_INVALID - invalid
+          if missing_invalid:
+              print("FAIL — known-bad manifest did not fail (fixture may have been fixed without updating expectation):", missing_invalid)
+              failed = True
+
+          unexpected_invalid = invalid - EXPECTED_INVALID
+          if unexpected_invalid:
+              print("FAIL — unexpected manifest failures:", unexpected_invalid)
+              failed = True
+
+          if failed:
+              raise SystemExit(1)
+
+          print(f"PASS — valid={sorted(valid)}, invalid={sorted(invalid)}")
+          EOF

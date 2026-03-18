@@ -1,0 +1,338 @@
+{
+  "workflow_id": "manifest_validator",
+  "name": "Manifest and Workflow Schema Validator",
+  "description": "Validates all agent, workflow, and orchestrator manifests against governance schemas and hardened OS rules before any orchestrator dispatch, workflow execution, or repo commit.",
+
+  "risk_level": "medium",
+
+  "inputs": {
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this validation is being run (pre-dispatch, pre-merge, pre-commit, manual)."
+    },
+    "target_scope": {
+      "type": "string",
+      "enum": [
+        "all",
+        "agents_only",
+        "workflows_only",
+        "orchestrator_only"
+      ],
+      "description": "Subset of manifests to validate. Defaults to all if unspecified."
+    }
+  },
+
+  "outputs": {
+    "status": {
+      "type": "string",
+      "enum": ["pass", "fail"],
+      "description": "Overall validation status across all manifests."
+    },
+    "errors": {
+      "type": "array",
+      "items": "string",
+      "description": "List of validation violations across schemas, governance, and directory structure."
+    },
+    "warnings": {
+      "type": "array",
+      "items": "string",
+      "description": "Non-fatal findings that should be reviewed by the operator."
+    },
+    "provenance_chain": {
+      "type": "array",
+      "items": "string",
+      "description": "Log-style chain of which agents, tools, and files were involved in validation."
+    },
+    "next_steps": {
+      "type": "array",
+      "items": "string",
+      "description": "Human-readable guidance for the operator on how to resolve failures or warnings."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "workflow_executor",
+      "agent_id": "workflow-agent"
+    },
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "staging_only_manifest_writes": true,
+    "human_approval_required_for": [
+      "overriding_validation_failures",
+      "changing_governance_schemas",
+      "merging_manifests_after_validation"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": [
+      "manifests/staging/",
+      "logs/workflows/",
+      "reports/"
+    ],
+    "forbidden_write_paths": [
+      "agents/core/",
+      "manifests/workflows/",
+      "governance/",
+      "docs/",
+      ".git/"
+    ],
+    "enforce_staging_only": true
+  },
+
+  "audit_requirements": {
+    "enforce_audit_agent": true,
+    "audit_role": "audit_enforcer",
+    "halt_on_violation": true,
+    "log_provenance": true,
+    "audit_log_path": "logs/workflows/manifest_validator.log",
+    "required_checks": [
+      "agent_manifest_schema_compliance",
+      "workflow_manifest_schema_compliance",
+      "orchestrator_manifest_schema_compliance",
+      "governance_rule_compliance",
+      "directory_structure_integrity",
+      "provenance_logging_presence"
+    ]
+  },
+
+  "skills": [
+    "load_all_manifests",
+    "validate_manifest_schema",
+    "validate_governance_rules",
+    "summarize_validation_results"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_read_inputs",
+      "name": "Read manifests and governance schemas",
+      "description": "Workflow Agent reads all target manifests and governance schemas with strict read-only access.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "inputs": {
+        "target_scope": "target_scope",
+        "paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "agents/core/orchestrator.json",
+          "governance/schemas/"
+        ]
+      },
+      "outputs": {
+        "loaded_agent_manifests": "context.agent_manifests",
+        "loaded_workflow_manifests": "context.workflow_manifests",
+        "loaded_orchestrator_manifest": "context.orchestrator_manifest",
+        "loaded_governance_schemas": "context.governance_schemas"
+      },
+      "constraints": {
+        "allowed_tools": ["local_fs_read"],
+        "allowed_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "governance/schemas/"
+        ],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls"],
+        "forbidden_paths": ["manifests/staging/", "governance/", ".git/"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure read-only. Any attempt to write or use forbidden tools halts the workflow."
+      }
+    },
+    {
+      "id": "step_2_schema_validation",
+      "name": "Validate manifests against schemas",
+      "description": "Workflow Agent validates all loaded manifests against the governance schemas and required fields.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "inputs": {
+        "agent_manifests": "context.agent_manifests",
+        "workflow_manifests": "context.workflow_manifests",
+        "orchestrator_manifest": "context.orchestrator_manifest",
+        "governance_schemas": "context.governance_schemas"
+      },
+      "outputs": {
+        "schema_errors": "context.schema_errors",
+        "schema_warnings": "context.schema_warnings"
+      },
+      "constraints": {
+        "allowed_tools": [],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure in-memory validation. Any IO or side effect halts the workflow."
+      }
+    },
+    {
+      "id": "step_3_governance_validation",
+      "name": "Enforce governance rules on manifests",
+      "description": "Workflow Agent applies governance rules: no destructive git, no infrastructure mutation, no financial actions, no PII, no governance modification, staging-only manifest writes.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "inputs": {
+        "agent_manifests": "context.agent_manifests",
+        "workflow_manifests": "context.workflow_manifests",
+        "orchestrator_manifest": "context.orchestrator_manifest"
+      },
+      "outputs": {
+        "governance_errors": "context.governance_errors",
+        "governance_warnings": "context.governance_warnings"
+      },
+      "constraints": {
+        "allowed_tools": [],
+        "forbidden_tools": [
+          "git_operations",
+          "infrastructure_commands",
+          "financial_tools",
+          "pii_processing_tools",
+          "governance_write"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "No tools with side effects. Any manifest indicating forbidden capabilities flags errors and halts downstream."
+      }
+    },
+    {
+      "id": "step_4_directory_structure_validation",
+      "name": "Validate required directory structure",
+      "description": "Workflow Agent confirms all required directories exist: agents/core/, manifests/workflows/, manifests/staging/, governance/, docs/change-requests/, logs/workflows/, reports/.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "inputs": {
+        "paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "manifests/staging/",
+          "governance/",
+          "docs/change-requests/",
+          "logs/workflows/",
+          "reports/"
+        ]
+      },
+      "outputs": {
+        "directory_errors": "context.directory_errors",
+        "directory_warnings": "context.directory_warnings"
+      },
+      "constraints": {
+        "allowed_tools": ["local_fs_read"],
+        "allowed_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "manifests/staging/",
+          "governance/",
+          "docs/change-requests/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": ["local_fs_write", "git_operations"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Read-only directory existence checks. Missing required directories are treated as validation failures."
+      }
+    },
+    {
+      "id": "step_5_audit_and_decide",
+      "name": "Audit results and decide status",
+      "description": "Audit Agent aggregates schema, governance, and directory errors into a single pass/fail decision with halt_on_violation semantics.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "inputs": {
+        "schema_errors": "context.schema_errors",
+        "governance_errors": "context.governance_errors",
+        "directory_errors": "context.directory_errors",
+        "schema_warnings": "context.schema_warnings",
+        "governance_warnings": "context.governance_warnings",
+        "directory_warnings": "context.directory_warnings"
+      },
+      "outputs": {
+        "status": "context.status",
+        "errors": "context.errors",
+        "warnings": "context.warnings",
+        "provenance_chain": "context.provenance_chain",
+        "next_steps": "context.next_steps"
+      },
+      "constraints": {
+        "allowed_tools": [],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": ["override_failures"],
+        "description": "Audit Agent computes a decision only. Overriding failures without explicit human approval is forbidden."
+      }
+    },
+    {
+      "id": "step_6_report_and_log",
+      "name": "Write validation report and workflow log",
+      "description": "Reporting Agent writes a human-readable report and machine-readable log to reports/ and logs/workflows/ with full provenance.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "inputs": {
+        "status": "context.status",
+        "errors": "context.errors",
+        "warnings": "context.warnings",
+        "provenance_chain": "context.provenance_chain",
+        "next_steps": "context.next_steps",
+        "trigger_reason": "trigger_reason"
+      },
+      "outputs": {
+        "report_path": "context.report_path",
+        "log_path": "context.log_path"
+      },
+      "constraints": {
+        "allowed_tools": ["local_fs_write_staging"],
+        "allowed_paths": ["logs/workflows/", "reports/"],
+        "forbidden_tools": ["git_operations"],
+        "forbidden_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "manifests/staging/",
+          "governance/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "requires_human_approval": [],
+        "description": "Reporting Agent writes only to logs/ and reports/. No manifest or governance files can be modified."
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/manifest_validator_workflow.log"
+  }
+}

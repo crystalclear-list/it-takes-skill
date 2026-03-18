@@ -1,0 +1,214 @@
+{
+  "manifest_id": "MNF-a3f8c2d1-e9b0-47f6-5c3a-8d2e1f094b7c",
+  "created_at": "2026-03-17T15:05:00Z",
+  "prepared_by": "finance_prep-v1.0.0",
+  "session_id": "WF-2026-03-001",
+  "summary": "Three cashflow optimization actions for March 2026: (1) offer Cobalt Ventures a 2% early-payment discount to accelerate $23,520 by March 14, eliminating the days 6–10 stress window; (2) contact Studio Novo to defer a $12,000 payment by 7 days; (3) reschedule Cloudframe payment to day 30 within existing Net-45 terms. One contingency action: pre-authorize Mercury reserve sweep if operating balance falls below $20,000. Estimated net cost: −$480. Minimum balance improvement in stress scenario: +$43,280.",
+
+  "actions": [
+    {
+      "action_id": "ACT-001",
+      "type": "external_api_call",
+      "description": "Send early-payment discount offer to Cobalt Ventures: 2% discount ($480) off INV-2026-043 ($24,000 → $23,520) in exchange for payment by March 14, 2026 instead of March 21+.",
+      "payload": {
+        "endpoint": "email:ar@cobaltventures.com",
+        "method": "POST",
+        "body": {
+          "to": "ar@cobaltventures.com",
+          "cc": "lisa@crystalclear.ai",
+          "subject": "Early Payment Option — INV-2026-043",
+          "invoice_number": "INV-2026-043",
+          "original_amount": 24000,
+          "discount_percentage": 2.0,
+          "discounted_amount": 23520,
+          "discount_savings": 480,
+          "early_pay_deadline": "2026-03-14",
+          "original_due_date": "2026-03-21"
+        },
+        "currency": "USD",
+        "amount": 23520,
+        "recipient": "Cobalt Ventures",
+        "notes": "Offer valid until 2026-03-20. If Cobalt declines, original terms apply. Do not follow up more than once without Lisa's instruction."
+      },
+      "reversible": false,
+      "estimated_impact": {
+        "financial": "medium",
+        "operational": "low",
+        "reputational": "low"
+      }
+    },
+    {
+      "action_id": "ACT-002",
+      "type": "external_api_call",
+      "description": "Contact Studio Novo accounts payable to request a 7-day deferral of INV payment: from March 10 to March 17, 2026. No contractual breach. Vendor relationship classified as strong.",
+      "payload": {
+        "endpoint": "email:billing@studionovo.co",
+        "method": "POST",
+        "body": {
+          "to": "billing@studionovo.co",
+          "cc": "lisa@crystalclear.ai",
+          "subject": "Payment Scheduling — February Invoice",
+          "request": "Request to shift payment date from March 10 to March 17",
+          "original_payment_date": "2026-03-10",
+          "requested_payment_date": "2026-03-17",
+          "amount": 12000,
+          "reason": "Internal cash scheduling optimization"
+        },
+        "currency": "USD",
+        "amount": 12000,
+        "recipient": "Studio Novo",
+        "notes": "If Studio Novo declines, pay on original date (March 10). This is a request, not a unilateral decision. Do not delay payment without confirmation."
+      },
+      "reversible": false,
+      "estimated_impact": {
+        "financial": "medium",
+        "operational": "low",
+        "reputational": "low"
+      }
+    },
+    {
+      "action_id": "ACT-003",
+      "type": "other_irreversible",
+      "description": "Reschedule Cloudframe payment from March 22 to March 30. Fully within existing Net-45 payment terms. No vendor communication required.",
+      "payload": {
+        "endpoint": "internal:quickbooks_ap",
+        "method": "PATCH",
+        "body": {
+          "vendor": "Cloudframe",
+          "invoice_ref": "CF-2026-FEB-14",
+          "current_scheduled_date": "2026-03-22",
+          "new_scheduled_date": "2026-03-30",
+          "amount": 6800,
+          "contract_terms": "Net-45",
+          "original_invoice_date": "2026-02-13",
+          "contract_deadline": "2026-03-30"
+        },
+        "currency": "USD",
+        "amount": 6800,
+        "recipient": "Cloudframe",
+        "notes": "Payment on March 30 is within Net-45 terms (invoice date Feb 13 → deadline March 30). No breach. No vendor notification required."
+      },
+      "reversible": false,
+      "estimated_impact": {
+        "financial": "low",
+        "operational": "none",
+        "reputational": "none"
+      }
+    },
+    {
+      "action_id": "ACT-004",
+      "type": "financial_transfer",
+      "description": "CONTINGENCY ONLY — Execute if and only if operating checking balance falls below $20,000 between March 6–10: transfer $7,200 from Mercury reserve account to operating checking. Replenish reserve by March 15.",
+      "payload": {
+        "endpoint": "mercury:transfer",
+        "method": "POST",
+        "body": {
+          "from_account": "mercury_reserve_xxxx4821",
+          "to_account": "chase_operating_xxxx7203",
+          "amount": 7200,
+          "memo": "Contingency transfer — March cashflow buffer — to be replenished by 2026-03-15",
+          "execute_condition": "IF operating balance < 20000 on any day between 2026-03-06 and 2026-03-10",
+          "replenishment_by": "2026-03-15"
+        },
+        "currency": "USD",
+        "amount": 7200,
+        "recipient": "CrystalClear Operating Account",
+        "notes": "This is a contingency action. Do NOT execute unless the trigger condition is met. If trigger is not met, this action is void. Reserve replenishment is required by March 15 regardless of business conditions."
+      },
+      "reversible": false,
+      "estimated_impact": {
+        "financial": "low",
+        "operational": "none",
+        "reputational": "none"
+      },
+      "dependencies": []
+    }
+  ],
+
+  "risk_assessment": {
+    "overall_risk_level": "medium",
+    "risk_score": 0.32,
+    "flags": [
+      {
+        "dimension": "reversibility",
+        "description": "All four actions are irreversible once executed. Payment timing commitments and discount offers cannot be rescinded without vendor/client friction.",
+        "severity": "medium",
+        "mitigation": "Finance-Prep has gated each action with explicit conditions, limits, and 'do not proceed' clauses for vendor non-confirmation."
+      },
+      {
+        "dimension": "accuracy",
+        "description": "Cobalt Ventures payment probability is estimated at 65% acceptance. If declined, the primary stress-scenario mitigation is unavailable.",
+        "severity": "low",
+        "mitigation": "ACT-001 decline does not create a problem in Base case. ACT-002 and ACT-003 together provide $18,800 of buffer — sufficient for Base case trough."
+      },
+      {
+        "dimension": "scope",
+        "description": "ACT-004 (reserve sweep) is a financial transfer between CrystalClear accounts. Trigger condition must be verified by Lisa before execution — the condition cannot be auto-triggered by an AI agent.",
+        "severity": "high",
+        "mitigation": "ACT-004 is explicitly labeled contingency. SR-001 applies: no AI agent may execute the transfer. Lisa must verify condition and execute manually."
+      },
+      {
+        "dimension": "compliance",
+        "description": "Cloudframe deferral (ACT-003) was verified against contract terms. Net-45 deadline is March 30 on a February 13 invoice date.",
+        "severity": "low",
+        "mitigation": "Within terms. No compliance risk identified."
+      }
+    ],
+    "go_no_go": "go_with_conditions",
+    "conditions": [
+      "ACT-004 must not be auto-executed by any automated system. Lisa must manually verify balance and execute the Mercury transfer herself.",
+      "ACT-001 discount must not exceed 2% ($480 max). If Cobalt requests a higher discount, escalate to Lisa before agreeing.",
+      "ACT-002 vendor delay requires Studio Novo confirmation. Payment must not be withheld unilaterally if Studio Novo does not respond within 48 hours.",
+      "If all four actions are approved, execute in order: ACT-003 first (no communication needed), then ACT-001 and ACT-002 simultaneously, then monitor for ACT-004 trigger."
+    ]
+  },
+
+  "alternatives": [
+    {
+      "description": "Do nothing — accept stress scenario if it materializes, draw on $50,000 LOC.",
+      "tradeoff": "Preserves all relationships with no communication overhead. Cost: LOC interest (~$83/month on $25K draw). Loses the $43K minimum balance improvement."
+    },
+    {
+      "description": "Draw $25,000 from operating line of credit preemptively on March 5.",
+      "tradeoff": "Simple, fully reversible (repay by March 20). Costs ~$55 interest. Avoids all vendor/client outreach. Recommended if Lisa prefers not to contact Cobalt or Studio Novo."
+    },
+    {
+      "description": "Delay payroll run 1 by 48 hours (March 6 → March 8).",
+      "tradeoff": "Gains 2 days; some SaaS and retainer inflows land before payroll. High HR risk; not recommended. Not included in manifest."
+    }
+  ],
+
+  "approval_required": {
+    "approver_role": "owner",
+    "approval_type": "single",
+    "sla_minutes": 2880,
+    "co_approver_role": null
+  },
+
+  "auditor_sign_off": {
+    "verdict": "approved_with_conditions",
+    "auditor_id": "auditor-v1.0.0",
+    "reviewed_at": "2026-03-17T14:22:00Z",
+    "conditions": [
+      "Session cap: no single outflow action may exceed $10,000",
+      "Cobalt discount must be exactly 2% ($480 on $24,000 = $23,520 net)",
+      "Reserve sweep must be packaged as contingency, not unconditional",
+      "Upside prepayment is not included in this manifest — not yet triggered"
+    ],
+    "notes": "All Stage 1–2 artifacts passed audit. Zero charter violations. TSK-004 escalation correctly routed. Finance-Prep conditions applied as instructed."
+  },
+
+  "provenance": {
+    "source_session_id": "WF-2026-03-001",
+    "planner_plan_id": "WF-2026-03-001-PLAN",
+    "executor_task_ids": ["TSK-001", "TSK-002", "TSK-003", "TSK-005"],
+    "skill_audit_trail_ref": "logs/workflows/march_cashflow.log"
+  },
+
+  "execution_record": {
+    "approved_by": null,
+    "approved_at": null,
+    "executed_actions": [],
+    "override_justification": null
+  }
+}
