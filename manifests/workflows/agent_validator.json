@@ -1,0 +1,105 @@
+{
+  "workflow_id": "agent_validator",
+  "name": "Agent Manifest Validator",
+  "description": "Validates all agent manifests in agents/core/ against governance/schemas/agent.schema.json. Runs before any orchestrator dispatch to ensure no agent manifest has drifted from the governed schema.",
+  "risk_level": "low",
+
+  "inputs": {
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this validation is being run (pre-dispatch, ci, manual)."
+    }
+  },
+
+  "outputs": {
+    "validated_manifests": {
+      "type": "object",
+      "description": "Agent manifests that passed schema and tool-overlap validation."
+    },
+    "failed_manifests": {
+      "type": "object",
+      "description": "Agent manifests that failed, with error messages."
+    },
+    "summary": {
+      "type": "object",
+      "description": "Counts and lists of valid/invalid agent manifests."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["logs/workflows/", "reports/"],
+    "forbidden_write_paths": ["governance/", "agents/core/", "manifests/workflows/", ".git/"],
+    "enforce_staging_only": true
+  },
+
+  "skills": [
+    "validate_agent_manifests",
+    "summarize_validation_results"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_validate_agent_manifests",
+      "name": "Validate agent manifests against schema",
+      "description": "Audit Agent validates all agents/core/*.json against agent.schema.json. Read-only.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "governance_read_only"],
+        "allowed_paths": ["agents/core/", "governance/schemas/"],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": []
+      }
+    },
+    {
+      "id": "step_2_summarize",
+      "name": "Summarize validation results",
+      "description": "Reporting Agent writes summary artifact to reports/.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_write_staging"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": ["git_operations"],
+        "forbidden_paths": ["governance/", "agents/core/", "manifests/workflows/", ".git/"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": []
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/agent_validator.log"
+  }
+}

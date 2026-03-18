@@ -1,9 +1,10 @@
 # CrystalClear Skill OS — Architecture
 
-**Version:** 1.0.0
+**Version:** 1.2.0
 **Status:** Ratified
 **Maintained by:** Skill OS Architect
-**Charter ref:** `governance/charter.yaml`
+**Charter ref:** `governance/agent-charter.md`
+**Last updated:** 2026-03-18 — runtime subpackages, CI contract, agent schema validation
 
 ---
 
@@ -20,7 +21,8 @@
 9. [Pipeline Automation](#9-pipeline-automation)
 10. [Module Boundaries & Packaging](#10-module-boundaries--packaging)
 11. [Key Design Decisions](#11-key-design-decisions)
-12. [File Map](#12-file-map)
+12. [CI and Operator Loop](#12-ci-and-operator-loop)
+13. [File Map](#13-file-map)
 
 ---
 
@@ -198,22 +200,49 @@ escalation_router   → routes issues to the correct human or agent
 
 ## 4. The Intelligence Engine
 
-The Intelligence Engine is the runtime that executes skills. It is not a single process — it is a coordination layer defined in `engine/intelligence_engine.md`.
+The Intelligence Engine is the runtime that executes skills. The full specification lives in `engine/intelligence_engine.md`. The live Python implementation lives in `engine/runtime/`.
 
-### Request Lifecycle (10 steps)
+### Runtime Implementation (`engine/runtime/`)
+
+The runtime is a Python package organized into four subpackages plus a thin orchestrator:
 
 ```
-1. Intent Verification    → intent_verification rejects injections
-2. Skill Resolution       → DAG walk to resolve all dependencies
-3. Pre-execution Audit    → risk_assessment, cot_governor
-4. L1 Execution           → atomic skills, in dependency order
-5. L2 Execution           → molecular skills, compose L1 outputs
-6. Governance Hook        → mid-execution checkpoint if declared
-7. L3 Execution           → system skill orchestration
-8. Post-execution Audit   → output_validator, self_audit, bias_scan
-9. Provenance Write       → provenance_tracker records lineage
-10. Delivery              → alignment_check on final output
+engine/runtime/
+├── __init__.py              # exposes run() only
+├── api.py                   # orchestrator: load → validate → resolve → execute → write
+├── errors.py                # typed error hierarchy (GovernanceError, ManifestError, SkillError, ...)
+├── manifest/
+│   ├── loader.py            # load_manifest(workflow_id) — reads manifests/workflows/
+│   └── validator.py         # validate_manifest(manifest) — schema + governance + agent-id checks
+├── skills/
+│   └── resolver.py          # resolve_skills(manifest) — importlib-based module resolution
+├── executor/
+│   └── sequential.py        # execute(skills, input_data) — sequential dict pipeline
+└── io/
+    ├── path_guard.py         # _assert_path_allowed() — reads governance/forbidden_paths.json
+    ├── output_writer.py      # write_output() — writes SHA-256 artifact to reports/
+    └── log_writer.py         # write_logs() — writes JSON Lines to logs/workflows/
 ```
+
+**Public entrypoint:**
+```python
+from engine.runtime import run
+result = run("workflow_id", input_data={"trigger_reason": "manual"})
+```
+
+**Run lifecycle:**
+```
+1. load_manifest()        — reads manifests/workflows/<id>.json
+2. validate_manifest()    — JSON Schema + halt_on_violation + agent_id cross-check
+3. resolve_skills()       — imports skills/<name>.py, verifies run() callable
+4. execute()              — sequential pipeline: output of skill N is input to skill N+1
+5. write_output()         — SHA-256 artifact → reports/<id>_<ts>.json
+6. write_logs()           — JSON Lines → logs/workflows/<id>_<ts>.log
+```
+
+Every step that raises `GovernanceError` or a subclass halts the run, logs a `governance_halt` event, and re-raises — no softening, no fallback dict.
+
+### Request Lifecycle (conceptual, 10 steps)
 
 ### DAG Dependency Resolution
 
@@ -309,12 +338,14 @@ Governance is not a layer on top of the system — it is threaded through every 
 
 | Artifact | Purpose | Path |
 |---------|---------|------|
-| Agent Charter | Defines what every agent MAY, MUST, and MUST NOT do | `governance/charter.yaml` |
-| Safety Rules | 34 non-negotiable rules across 4 categories | `governance/safety-rules.md` |
-| Execution Contracts | Layer-specific and agent-specific behavioral contracts | `governance/execution-contracts.md` |
-| Manifest Schema | JSON Schema for Money Key approval manifests | `governance/manifest_schema.json` |
-| Inter-Agent Protocol | Typed message envelopes for all agent handoffs | `governance/inter_agent_protocol.md` |
-| Agent Primers | Full behavioral specification for each agent | `governance/agent_primers/*.md` |
+| Agent Charter | Seven unconditional rules governing every agent | `governance/agent-charter.md` |
+| Execution Contract | What every workflow run must guarantee | `governance/execution-contract.md` |
+| Safety Rules | Non-negotiable rules across 4 categories | `governance/safety-rules.md` |
+| Forbidden Paths | Write-path blocklist loaded at runtime by `path_guard` | `governance/forbidden_paths.json` |
+| Workflow Schema | JSON Schema for workflow manifests in `manifests/workflows/` | `governance/schemas/manifest.schema.json` |
+| Agent Schema | JSON Schema for agent manifests in `agents/core/` | `governance/schemas/agent.schema.json` |
+
+All governance files are enforced by the `governance_health_check` workflow — CI fails if any are absent or empty. The schemas are validated at runtime before any workflow executes; agent manifests are validated by the `agent_validator` workflow in CI.
 
 ### Skill Registry
 
@@ -521,75 +552,142 @@ Unstructured agent-to-agent communication is a governance anti-pattern. If agent
 
 ---
 
-## 12. File Map
+## 12. CI and Operator Loop
+
+Full reference: `docs/ci-contract.md`.
+
+### CI Gate (`.github/workflows/ci.yml`)
+
+Runs on every push to `foundation` and every PR to `main`. Four checks in order:
+
+| Step | What it runs | Fails if |
+|---|---|---|
+| pytest | `tests/` — 55 tests | Any test fails |
+| Governance health check | `governance_health_check` workflow | Any constitution file missing |
+| Agent manifest validator | `agent_validator` workflow | Any `agents/core/*.json` fails `agent.schema.json` |
+| Manifest validator | `manifest_validator` workflow | Known-good fails; unexpected failure appears |
+
+### Local Operator Loop (`make`)
+
+```
+make check          # full pre-push gate (mirrors CI exactly)
+make test           # pytest suite
+make validate       # manifest validator tests
+make agent-schema   # agent schema tests
+make health         # governance health check tests
+make run WORKFLOW=<id>   # run any workflow, print summary
+make logs WORKFLOW=<id>  # tail most recent log for a workflow
+make install        # pip install pytest jsonschema
+```
+
+Daily loop: **edit → `make check` → `make run WORKFLOW=...` → push**.
+
+### Fixture Contract
+
+`manifests/workflows/` holds three permanent fixtures whose pass/fail status is asserted in CI:
+
+| Manifest | Expected | Reason |
+|---|---|---|
+| `manifest_validator` | always valid | self-validating workflow |
+| `governance_health_check` | always valid | constitution pre-flight |
+| `agent_validator` | always valid | agent schema gate |
+| `bad_actor_workflow` | always invalid | `halt_on_violation: false` + `rogue-agent` |
+
+Adding a new workflow manifest to `manifests/workflows/` that fails validation will break CI until it is fixed or explicitly registered in `_EXPECTED_INVALID` in `tests/test_workflows.py`.
+
+---
+
+## 13. File Map
 
 ```
 it-takes-skill/
-├── README.md                          # Project overview and quick start
-├── MANIFESTO.md                       # Design philosophy and principles
-├── ROADMAP.md                         # Quarterly milestones
-├── CONTRIBUTING.md                    # Contribution guidelines
-├── CODE_OF_CONDUCT.md                 # Community standards
-├── SKILL_REGISTRY.json                # Central skill index (all 40 skills)
-├── SKILL_PERIODIC_TABLE.md            # Visual skill map
+├── README.md
+├── MANIFESTO.md
+├── ROADMAP.md
+├── SKILL_REGISTRY.json                # Central index of all 40 skills
+├── SKILL_PERIODIC_TABLE.md
+├── Makefile                           # Operator loop — make check / run / logs
 │
-├── skills/
-│   ├── atomic/          (10 skills)   # L1 — deterministic transforms
-│   ├── molecular/       (10 skills)   # L2 — composed capabilities
-│   ├── system/          (10 skills)   # L3 — agentic workflows
-│   └── meta/            (10 skills)   # L4 — governance layer
+├── .github/
+│   └── workflows/
+│       └── ci.yml                     # CI gate (push to foundation, PR to main)
 │
 ├── engine/
-│   └── intelligence_engine.md         # Runtime specification
+│   └── runtime/                       # Live Python runtime
+│       ├── __init__.py                # exposes run() only
+│       ├── api.py                     # thin orchestrator
+│       ├── errors.py                  # typed error hierarchy
+│       ├── manifest/
+│       │   ├── loader.py              # load_manifest()
+│       │   └── validator.py           # validate_manifest()
+│       ├── skills/
+│       │   └── resolver.py            # resolve_skills()
+│       ├── executor/
+│       │   └── sequential.py          # execute() — sequential dict pipeline
+│       └── io/
+│           ├── path_guard.py          # forbidden path enforcement
+│           ├── output_writer.py       # SHA-256 artifacts → reports/
+│           └── log_writer.py          # JSON Lines → logs/workflows/
 │
 ├── governance/
-│   ├── charter.yaml                   # Machine-readable agent charter
-│   ├── charter.md                     # Human-readable charter
-│   ├── safety-rules.md                # 34 safety rules (SR-001–SR-034)
-│   ├── execution-contracts.md         # Layer + agent contracts
-│   ├── manifest_schema.json           # JSON Schema for Money Key manifests
-│   ├── inter_agent_protocol.md        # Typed agent handoff specification
-│   ├── bootstrap.sh                   # Generates agent configs + pipeline
-│   └── agent_primers/
-│       ├── planner.md
-│       ├── executor.md
-│       ├── auditor.md
-│       ├── finance_prep.md
-│       └── money_key.md
+│   ├── agent-charter.md               # Seven unconditional agent rules
+│   ├── execution-contract.md          # Per-run guarantees
+│   ├── safety-rules.md                # Safety rule set
+│   ├── forbidden_paths.json           # Write-path blocklist (runtime-loaded)
+│   └── schemas/
+│       ├── manifest.schema.json       # JSON Schema for workflow manifests
+│       └── agent.schema.json          # JSON Schema for agent manifests
 │
 ├── agents/
-│   ├── planner.config.json
-│   ├── executor.config.json
-│   ├── auditor.config.json
-│   ├── finance_prep.config.json
-│   └── money_key.config.json
+│   └── core/                          # Six governed agent manifests
+│       ├── audit.json                 # audit-agent
+│       ├── manifest.json              # manifest-agent
+│       ├── orchestrator.json          # orchestrator-agent
+│       ├── repo.json                  # repo-agent
+│       ├── reporting.json             # reporting-agent
+│       └── workflow.json              # workflow-agent
 │
-├── pipelines/
-│   ├── agent_pipeline.yaml            # 5-stage pipeline wiring
-│   ├── events.md                      # 25 event type definitions
-│   ├── triggers.md                    # 5 trigger types
-│   └── workflow_templates.md          # Reusable workflow patterns
+├── manifests/
+│   ├── workflows/                     # Live workflow manifests (CI-validated)
+│   │   ├── manifest_validator.json    # known-good fixture + active workflow
+│   │   ├── governance_health_check.json
+│   │   ├── agent_validator.json
+│   │   └── bad_actor_workflow.json    # known-bad fixture
+│   └── staging/                       # Staging area for proposed manifests
 │
-├── workflows/
-│   └── first_workflow.cashflow.md     # March cashflow optimization (WF-2026-03-001)
+├── skills/                            # Python skill modules (run(data)->dict)
+│   ├── atomic/                        # L1 — deterministic transforms (.md specs)
+│   ├── molecular/                     # L2 — composed capabilities (.md specs)
+│   ├── system/                        # L3 — agentic workflows (.md specs)
+│   ├── meta/                          # L4 — governance layer (.md specs)
+│   ├── load_all_manifests.py
+│   ├── validate_manifest_schema.py
+│   ├── validate_governance_rules.py
+│   ├── validate_agent_manifests.py
+│   ├── check_governance_files.py
+│   └── summarize_validation_results.py
 │
-├── reports/                           # Executor + Auditor artifacts (tracked)
-├── manifests/                         # Finance-Prep manifests (tracked)
-├── logs/workflows/                    # Append-only workflow logs (tracked)
+├── tests/                             # pytest suite
+│   ├── test_errors.py                 # error hierarchy unit tests
+│   ├── test_manifest.py               # loader + validator unit tests
+│   ├── test_path_guard.py             # forbidden path unit tests
+│   ├── test_agent_schema.py           # agent schema unit + integration tests
+│   └── test_workflows.py              # end-to-end workflow integration tests
 │
-├── packaging/
-│   ├── versioning.md                  # Semver strategy + deprecation policy
-│   ├── distribution.md                # .skillpack format + install flow
-│   └── module_structure.md            # 6 module boundaries
-│
-├── ui/
-│   └── spec.md                        # Cockpit UI specification
+├── scripts/
+│   ├── run_workflow.py                # python scripts/run_workflow.py <id>
+│   └── tail_logs.py                   # python scripts/tail_logs.py <id>
 │
 ├── docs/
-│   └── architecture.md                # This document
+│   ├── architecture.md                # This document
+│   ├── ci-contract.md                 # CI gate spec and local operator loop
+│   └── change-requests/               # CR-YYYY-MM-NNN change request docs
 │
-└── .claude/
-    └── project.yaml                   # Agent system prompts for Claude sessions
+├── reports/                           # SHA-256 output artifacts (git-tracked)
+├── logs/
+│   └── workflows/                     # Append-only JSON Lines logs (git-tracked)
+│
+└── pipelines/                         # Pipeline automation definitions
 ```
 
 ---

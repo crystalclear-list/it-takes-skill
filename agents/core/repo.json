@@ -22,14 +22,21 @@
   ],
 
   "tool_constraints": {
-    "allowed_paths": [
-      "agents/core/",
-      "manifests/workflows/",
-      "manifests/staging/",
-      "logs/workflows/",
-      "reports/",
-      "docs/"
-    ],
+    "allowed_paths": {
+      "read": [
+        "agents/core/",
+        "manifests/workflows/",
+        "manifests/staging/",
+        "logs/workflows/",
+        "reports/",
+        "docs/",
+        "governance/"
+      ],
+      "write": [
+        "logs/workflows/",
+        "reports/"
+      ]
+    },
     "allowed_tools": [
       "git_status",
       "git_diff",

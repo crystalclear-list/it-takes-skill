@@ -40,12 +40,25 @@ jobs:
           print("PASS — all governance files present:", result["result"]["present_files"])
           EOF
 
+      - name: Agent manifest validator (all core agents must pass schema)
+        run: |
+          python - <<'EOF'
+          from engine.runtime import run
+          result  = run("agent_validator", input_data={"trigger_reason": "ci"})
+          failed  = result["result"]["failed_manifests"]
+          summary = result["result"]["summary"]
+          if failed:
+              print("FAIL — agent manifests failed schema validation:", failed)
+              raise SystemExit(1)
+          print(f"PASS — all {summary['total_manifests']} agent manifests valid")
+          EOF
+
       - name: Manifest validator (known-good pass, known-bad fail)
         run: |
           python - <<'EOF'
           from engine.runtime import run
 
-          EXPECTED_VALID   = {"manifest_validator", "governance_health_check"}
+          EXPECTED_VALID   = {"manifest_validator", "governance_health_check", "agent_validator"}
           EXPECTED_INVALID = {"bad_actor_workflow"}
 
           result  = run("manifest_validator", input_data={"target_scope": "all", "trigger_reason": "ci"})

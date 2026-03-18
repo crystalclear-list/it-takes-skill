@@ -34,7 +34,7 @@ class TestGovernanceHealthCheck:
 # ── manifest_validator ───────────────────────────────────────────────────────
 
 # These are the manifests we know should always pass.
-_EXPECTED_VALID = {"manifest_validator", "governance_health_check"}
+_EXPECTED_VALID = {"manifest_validator", "governance_health_check", "agent_validator"}
 
 # bad_actor_workflow is a permanent known-bad fixture — it MUST always appear here.
 _EXPECTED_INVALID = {"bad_actor_workflow"}
