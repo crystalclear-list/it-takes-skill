@@ -203,3 +203,58 @@ class TestN8nDispatchManifest:
         )
         forbidden = staging["staging_requirements"]["forbidden_write_paths"]
         assert "config/" in forbidden
+
+
+# ── endpoint hygiene (phase 1 additions) ─────────────────────────────────────
+
+class TestEndpointHygienePhase1:
+    """Phase 1 content-automation additions: audit-pre-check field, infra gate, excluded-category guard."""
+
+    def _config(self):
+        return json.loads(Path("config/n8n_endpoints.json").read_text())
+
+    def _dispatch_manifest(self):
+        return json.loads(
+            Path("manifests/workflows/n8n_dispatch_basic.json").read_text()
+        )
+
+    def test_all_endpoints_have_requires_audit_pre_check_field(self):
+        """Every endpoint must declare requires_audit_pre_check (true or false, never absent)."""
+        for name, ep in self._config()["endpoints"].items():
+            assert "requires_audit_pre_check" in ep, (
+                f"Endpoint '{name}' is missing requires_audit_pre_check field"
+            )
+
+    def test_infra_sensitive_covered_by_human_approval_gate(self):
+        """The n8n_dispatch_basic manifest must require human approval for infra_sensitive dispatches."""
+        cfg = self._config()
+        infra_names = [
+            name for name, ep in cfg["endpoints"].items()
+            if ep.get("category") == "infra_sensitive"
+        ]
+        assert infra_names, "No infra_sensitive endpoints found — test data may be missing"
+        human_approval_list = self._dispatch_manifest()["governance_requirements"].get(
+            "human_approval_required_for", []
+        )
+        assert "dispatching_infra_sensitive_workflows" in human_approval_list, (
+            "n8n_dispatch_basic.governance_requirements.human_approval_required_for must contain "
+            "'dispatching_infra_sensitive_workflows' because infra_sensitive endpoints exist: "
+            f"{infra_names}"
+        )
+
+    def test_no_endpoint_uses_excluded_category(self):
+        """No endpoint category may match an entry in _excluded_categories.excluded."""
+        cfg = self._config()
+        valid_categories = {"content_automation", "reporting", "infra_sensitive"}
+        excluded_raw = cfg.get("_excluded_categories", {}).get("excluded", [])
+        # Normalise to lowercase underscore for comparison
+        excluded_normalised = {e.lower().replace(" ", "_") for e in excluded_raw}
+        for name, ep in cfg["endpoints"].items():
+            cat = ep.get("category", "")
+            assert cat in valid_categories, (
+                f"Endpoint '{name}' category '{cat}' is not in the valid set {valid_categories}"
+            )
+            for excl in excluded_normalised:
+                assert excl not in cat, (
+                    f"Endpoint '{name}' category '{cat}' matches excluded category '{excl}'"
+                )
