@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "_comment": "Approved n8n endpoint allowlist. No secrets — only env var names. All values enforced by audit_n8n_payload.py before dispatch. This file is a forbidden write path at runtime (governance/forbidden_paths.json). Changes require a human commit and CI pass.",
+
+  "global_constraints": {
+    "allowed_scheme": "https",
+    "allowed_method": "POST",
+    "allowed_host": "YOUR_N8N_HOST",
+    "max_payload_bytes": 4096,
+    "request_timeout_seconds": 30
+  },
+
+  "endpoints": {
+    "content__tiktok_repost_daily": {
+      "url": "https://YOUR_N8N_HOST/webhook/tiktok-repost-daily",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_TIKTOK",
+      "allowed_payload_keys": ["video_id", "caption", "schedule_slot"],
+      "description": "Triggers daily TikTok repost workflow. Accepts a single video ID, optional caption override, and optional schedule slot.",
+      "category": "content_automation",
+      "requires_audit_pre_check": false
+    },
+    "content__ig_crosspost": {
+      "url": "https://YOUR_N8N_HOST/webhook/ig-crosspost",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_IG",
+      "allowed_payload_keys": ["video_id", "caption", "platforms"],
+      "description": "Cross-posts video to Instagram Reels. Platforms field is a list constrained to ['instagram'].",
+      "category": "content_automation",
+      "requires_audit_pre_check": false
+    },
+    "content__of_nurture_sequence": {
+      "url": "https://YOUR_N8N_HOST/webhook/of-nurture",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_OF_NURTURE",
+      "allowed_payload_keys": ["sequence_id", "trigger_reason"],
+      "description": "Triggers an OnlyFans nurture sequence by sequence ID. No subscriber PII in payload — IDs only.",
+      "category": "content_automation",
+      "requires_audit_pre_check": true
+    },
+    "reporting__weekly_revenue_summary": {
+      "url": "https://YOUR_N8N_HOST/webhook/weekly-revenue-summary",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_REPORTING",
+      "allowed_payload_keys": ["report_period", "trigger_reason"],
+      "description": "Triggers weekly revenue summary generation in n8n. Output is a report, not a financial action.",
+      "category": "reporting",
+      "requires_audit_pre_check": false
+    }
+  },
+
+  "_excluded_categories": {
+    "note": "The following action types must NOT be added to this file. They are governed by the Money Key pattern and require human execution.",
+    "excluded": [
+      "stripe_charges_or_payouts",
+      "subscription_pricing_changes",
+      "credential_or_auth_rotation",
+      "bulk_platform_data_export",
+      "any_infra_mutation"
+    ]
+  }
+}

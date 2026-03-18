@@ -10,7 +10,9 @@
   "capabilities": [
     "read_and_interpret_workflow_manifests_from_manifests_workflows",
     "invoke_specialized_agents_through_orchestrator_by_role",
-    "propose_workflow_changes_to_manifests_staging_only"
+    "propose_workflow_changes_to_manifests_staging_only",
+    "read_n8n_endpoint_config",
+    "invoke_approved_n8n_workflow"
   ],
 
   "skills_required": [
@@ -23,7 +25,8 @@
     "allowed_paths": {
       "read": [
         "manifests/workflows/",
-        "agents/core/"
+        "agents/core/",
+        "config/n8n_endpoints.json"
       ],
       "write": [
         "manifests/staging/",
@@ -33,15 +36,18 @@
     "allowed_tools": [
       "local_fs_read",
       "local_fs_write_staging",
-      "log_emit"
+      "log_emit",
+      "http_post_n8n"
     ],
     "denied_tools": [
       "git_operations",
       "infrastructure_mutation",
       "financial_tools",
       "pii_handling_tools",
-      "governance_file_write"
-    ]
+      "governance_file_write",
+      "network_calls"
+    ],
+    "tool_constraint_notes": "http_post_n8n is a scoped subset of network_calls: HTTPS-only, POST-only, approved-host-only (enforced by audit_n8n_payload.py and config/n8n_endpoints.json). network_calls refers to general unscoped network access and remains denied."
   },
 
   "inputs": {

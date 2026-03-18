@@ -7,6 +7,7 @@ _REQUIRED_GOVERNANCE_FILES = [
     "governance/forbidden_paths.json",
     "governance/schemas/manifest.schema.json",
     "governance/schemas/agent.schema.json",
+    "config/n8n_endpoints.json",
 ]
 
 

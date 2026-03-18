@@ -29,8 +29,9 @@ health:
 	$(PYTEST) tests/test_workflows.py::TestGovernanceHealthCheck -v --tb=short
 
 ## Run a workflow:  make run WORKFLOW=manifest_validator
+## With extra input: make run WORKFLOW=n8n_dispatch_basic INPUT='{"logical_workflow_name":"content__tiktok_repost_daily","payload":{"video_id":"abc"}}'
 run:
-	cd $(CURDIR) && $(PYTHON) scripts/run_workflow.py $(WORKFLOW) make-run
+	cd $(CURDIR) && $(PYTHON) scripts/run_workflow.py $(WORKFLOW) make-run '$(INPUT)'
 
 ## Tail the most recent log:  make logs WORKFLOW=manifest_validator
 logs:
