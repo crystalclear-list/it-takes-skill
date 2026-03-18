@@ -329,3 +329,75 @@ class TestPhase2Endpoints:
         assert env_var.isupper() or "_" in env_var, (
             f"auth_env_var '{env_var}' looks like a value, not a variable name"
         )
+
+
+# ── Phase 3 endpoint assertions ───────────────────────────────────────────────
+
+class TestPhase3Endpoints:
+    """Assertions for the re-engagement segment build endpoint and Phase 2 key extensions."""
+
+    def _config(self):
+        return json.loads(Path("config/n8n_endpoints.json").read_text())
+
+    # ── content__reengage_segment_build ───────────────────────────────────────
+
+    def test_reengage_segment_build_endpoint_exists(self):
+        assert "content__reengage_segment_build" in self._config()["endpoints"]
+
+    def test_reengage_segment_build_category_is_reporting(self):
+        ep = self._config()["endpoints"]["content__reengage_segment_build"]
+        assert ep["category"] == "reporting", (
+            "content__reengage_segment_build must be category=reporting "
+            "(read-only analytics; does not post content)"
+        )
+
+    def test_reengage_segment_build_requires_audit_pre_check(self):
+        ep = self._config()["endpoints"]["content__reengage_segment_build"]
+        assert ep.get("requires_audit_pre_check") is True
+
+    def test_reengage_segment_build_has_required_payload_keys(self):
+        ep = self._config()["endpoints"]["content__reengage_segment_build"]
+        required = {"platform", "brand", "lookback_days", "trigger_reason"}
+        missing = required - set(ep["allowed_payload_keys"])
+        assert not missing, (
+            f"content__reengage_segment_build is missing payload keys: {missing}"
+        )
+
+    def test_reengage_segment_build_url_is_https(self):
+        ep = self._config()["endpoints"]["content__reengage_segment_build"]
+        assert ep["url"].startswith("https://")
+
+    def test_reengage_segment_build_url_on_approved_host(self):
+        cfg = self._config()
+        allowed_host = cfg["global_constraints"]["allowed_host"]
+        ep = cfg["endpoints"]["content__reengage_segment_build"]
+        assert allowed_host in ep["url"], (
+            f"content__reengage_segment_build URL must contain approved host '{allowed_host}'"
+        )
+
+    # ── Phase 2 endpoint key extensions ──────────────────────────────────────
+
+    def test_calendar_dispatch_has_campaign_type_key(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        assert "campaign_type" in ep["allowed_payload_keys"], (
+            "content__calendar_dispatch_daily must include campaign_type in allowed_payload_keys "
+            "(added for re-engagement engine integration)"
+        )
+
+    def test_calendar_dispatch_has_segment_key(self):
+        ep = self._config()["endpoints"]["content__calendar_dispatch_daily"]
+        assert "segment" in ep["allowed_payload_keys"], (
+            "content__calendar_dispatch_daily must include segment in allowed_payload_keys"
+        )
+
+    def test_tiktok_repost_has_campaign_type_key(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert "campaign_type" in ep["allowed_payload_keys"], (
+            "content__tiktok_repost_daily must include campaign_type in allowed_payload_keys"
+        )
+
+    def test_tiktok_repost_has_segment_key(self):
+        ep = self._config()["endpoints"]["content__tiktok_repost_daily"]
+        assert "segment" in ep["allowed_payload_keys"], (
+            "content__tiktok_repost_daily must include segment in allowed_payload_keys"
+        )

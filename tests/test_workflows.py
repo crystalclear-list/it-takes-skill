@@ -39,6 +39,7 @@ class TestGovernanceHealthCheck:
 _EXPECTED_VALID = {
     "manifest_validator", "governance_health_check", "agent_validator", "n8n_dispatch_basic",
     "content_automation_deploy", "tiktok_repost_skill", "content_calendar_skill",
+    "reengagement_segment_builder",
 }
 
 # bad_actor_workflow is a permanent known-bad fixture — it MUST always appear here.
@@ -320,6 +321,98 @@ class TestContentCalendarSkillManifest:
                 f"Step '{step_id}' in content_calendar_skill allows http_post_n8n. "
                 "This workflow generates proposals only — dispatch happens after operator promotion."
             )
+
+    def test_manifest_passes_schema_validation(self):
+        from engine.runtime.manifest.validator import validate_manifest
+        validate_manifest(self._manifest())  # must not raise
+
+
+# ── reengagement_segment_builder staging manifest ─────────────────────────────
+
+class TestReengagementSegmentBuilderManifest:
+    """Assertions for the reengagement_segment_builder staging proposal."""
+
+    _PATH = Path("manifests/staging/reengagement_segment_builder.json")
+
+    def _manifest(self):
+        return json.loads(self._PATH.read_text())
+
+    def test_manifest_exists(self):
+        assert self._PATH.exists()
+
+    def test_halt_on_violation_true(self):
+        assert self._manifest()["governance_requirements"]["halt_on_violation"] is True
+
+    def test_staging_only_manifest_writes(self):
+        assert self._manifest()["governance_requirements"].get("staging_only_manifest_writes") is True
+
+    def test_governance_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("governance"), (
+                f"reengagement_segment_builder allows writing to governance/: '{path}'"
+            )
+
+    def test_config_not_in_allowed_write_paths(self):
+        for path in self._manifest()["staging_requirements"]["allowed_write_paths"]:
+            assert not path.startswith("config"), (
+                f"reengagement_segment_builder allows writing to config/: '{path}'"
+            )
+
+    def test_production_manifests_in_forbidden_write_paths(self):
+        forbidden = self._manifest()["staging_requirements"]["forbidden_write_paths"]
+        assert "manifests/workflows/" in forbidden, (
+            "reengagement_segment_builder must forbid writes to manifests/workflows/"
+        )
+
+    def test_human_approval_required_for_warm_segment_review(self):
+        approvals = self._manifest()["governance_requirements"].get(
+            "human_approval_required_for", []
+        )
+        assert any("warm" in a or "segment" in a or "review" in a for a in approvals), (
+            "reengagement_segment_builder must require human approval for warm segment review. "
+            f"Got: {approvals}"
+        )
+
+    def test_pii_audit_step_present(self):
+        """There must be a dedicated PII audit step for segment rows (step 3)."""
+        steps = self._manifest()["steps"]
+        pii_steps = [
+            s for s in steps
+            if s.get("agent_role") == "audit_enforcer"
+            and "pii" in s.get("id", "").lower()
+        ]
+        assert pii_steps, (
+            "reengagement_segment_builder must have a dedicated PII audit step "
+            "(agent_role=audit_enforcer with 'pii' in step id) to validate segment rows "
+            "before they are written to staging"
+        )
+
+    def test_dispatch_step_uses_only_http_post_n8n(self):
+        """The workflow_executor dispatch step must allow http_post_n8n and deny network_calls."""
+        steps = self._manifest()["steps"]
+        dispatch = next(
+            (s for s in steps if s.get("agent_role") == "workflow_executor"),
+            None,
+        )
+        assert dispatch is not None, (
+            "No workflow_executor step found in reengagement_segment_builder"
+        )
+        allowed = dispatch["constraints"].get("allowed_tools", [])
+        forbidden = dispatch["constraints"].get("forbidden_tools", [])
+        assert "http_post_n8n" in allowed, (
+            f"workflow_executor step '{dispatch['id']}' must allow http_post_n8n"
+        )
+        assert "network_calls" in forbidden, (
+            f"workflow_executor step '{dispatch['id']}' must explicitly deny network_calls"
+        )
+
+    def test_paid_retargeting_excluded(self):
+        """Paid retargeting must not appear in any step's allowed actions or outputs."""
+        manifest_text = self._PATH.read_text().lower()
+        assert "paid_retargeting" not in manifest_text or "excluded" in manifest_text, (
+            "reengagement_segment_builder must not enable paid retargeting — "
+            "this requires a separate financial CR"
+        )
 
     def test_manifest_passes_schema_validation(self):
         from engine.runtime.manifest.validator import validate_manifest

@@ -164,7 +164,7 @@ No endpoint changes required for this CR.
 ### Deployment
 
 - [x] Promoted `manifests/staging/tiktok_repost_skill.json` → `manifests/workflows/`
-- [ ] Commit hash: _(populated after commit)_
+- [x] Commit hash: `7458ecb` on `feature/n8n-integration-blueprint-impl`
 
 ---
 

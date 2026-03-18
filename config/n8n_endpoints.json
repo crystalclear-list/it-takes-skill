@@ -18,7 +18,8 @@
       "auth_env_var": "N8N_WEBHOOK_TOKEN_TIKTOK",
       "allowed_payload_keys": [
         "post_id", "video_id", "platform", "caption_rendered",
-        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id"
+        "hashtag_set_id", "link_url", "scheduled_date", "time_slot", "n8n_run_id",
+        "campaign_type", "segment"
       ],
       "description": "Triggers TikTok repost workflow for Account B (@the-steele-zone repost account). Fires twice daily from post_schedule.csv AM + PM rows where platform=tiktok_repost.",
       "category": "content_automation",
@@ -121,10 +122,22 @@
       "auth_env_var": "N8N_WEBHOOK_TOKEN_CALENDAR",
       "allowed_payload_keys": [
         "date", "brand", "platform", "post_id", "caption_rendered",
-        "hashtag_set_id", "link_url", "trigger_reason", "n8n_run_id", "time_slot"
+        "hashtag_set_id", "link_url", "trigger_reason", "n8n_run_id", "time_slot",
+        "campaign_type", "segment"
       ],
       "description": "Triggers the daily calendar-driven dispatch workflow for both brands. brand must be one of: steelezone | discobass. DiscoBass: DJ mix clips, BTS, event promos — rate-limited via n8n Delay/Cron nodes. SteeleZone: routed through content__tiktok_repost_daily audit path; adult-content daily review gate applies.",
       "category": "content_automation",
+      "requires_audit_pre_check": true
+    },
+
+    "content__reengage_segment_build": {
+      "url": "https://dispensible-jovanni-faddiest.ngrok-free.dev/webhook/reengage-segment-build",
+      "auth_env_var": "N8N_WEBHOOK_TOKEN_REENGAGE",
+      "allowed_payload_keys": [
+        "platform", "brand", "lookback_days", "trigger_reason", "n8n_run_id"
+      ],
+      "description": "Reads engagement analytics for the given platform/brand over lookback_days and returns segment classification rows (warm/cool/cold). Read-only — does not post content or mutate platform data. All returned rows are PII-audited before staging.",
+      "category": "reporting",
       "requires_audit_pre_check": true
     },
 
