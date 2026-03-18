@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HITL Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7f8; color: #222; }
+    h1 { margin-bottom: 8px; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    button { margin-right: 8px; padding: 6px 10px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+    button:hover { background: #f1f1f1; }
+    .muted { color: #666; font-size: 14px; }
+    code { background: #f2f2f2; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>HITL Approval Dashboard</h1>
+  <p class="muted">Approve or reject low-confidence agent actions.</p>
+  <p class="muted">API: <code id="api-url"></code></p>
+  <div>
+    <button onclick="loadApprovals()">Refresh Pending Approvals</button>
+  </div>
+  <div id="list"></div>
+
+  <script>
+    const approvalApi = `${window.location.protocol}//${window.location.hostname}:8002`;
+    document.getElementById('api-url').textContent = approvalApi;
+
+    async function loadApprovals() {
+      const list = document.getElementById('list');
+      list.innerHTML = '<p>Loading...</p>';
+      try {
+        const response = await fetch(`${approvalApi}/approvals?status=pending`);
+        const data = await response.json();
+        if (!Array.isArray(data) || data.length === 0) {
+          list.innerHTML = '<div class="card">No pending approvals 🎉</div>';
+          return;
+        }
+        list.innerHTML = '';
+        for (const item of data) {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <h3>Task ${item.task_id}</h3>
+            <p><strong>Action:</strong> ${item.action}</p>
+            <p><strong>Agent:</strong> ${item.proposed_by}</p>
+            <p><strong>Confidence:</strong> ${item.confidence}</p>
+            <p class="muted">Reason: ${item.reason || 'none'}</p>
+          `;
+
+          const approveBtn = document.createElement('button');
+          approveBtn.textContent = 'Approve';
+          approveBtn.onclick = () => submitDecision(item.id, 'approved');
+
+          const rejectBtn = document.createElement('button');
+          rejectBtn.textContent = 'Reject';
+          rejectBtn.onclick = () => submitDecision(item.id, 'rejected');
+
+          card.appendChild(approveBtn);
+          card.appendChild(rejectBtn);
+          list.appendChild(card);
+        }
+      } catch (err) {
+        list.innerHTML = `<div class="card">Error loading approvals: ${err}</div>`;
+      }
+    }
+
+    async function submitDecision(approvalId, decision) {
+      const note = decision === 'approved' ? 'Looks safe' : 'Needs revision';
+      await fetch(`${approvalApi}/approvals/${approvalId}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewer: 'student', decision, note })
+      });
+      loadApprovals();
+    }
+
+    loadApprovals();
+  </script>
+</body>
+</html>
