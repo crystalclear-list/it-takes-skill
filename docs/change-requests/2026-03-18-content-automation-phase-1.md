@@ -198,7 +198,7 @@ The existing 3-category model (`content_automation`, `infra_sensitive`, `reporti
 
 - [x] Promoted `manifests/staging/content_automation_deploy.json` → `manifests/workflows/content_automation_deploy.json`
 - [x] Committed to git on `feature/n8n-integration-blueprint-impl`
-- [ ] Commit hash: _(populated after commit)_
+- [x] Commit hash: `ce0b391` on `feature/n8n-integration-blueprint-impl`
 
 ---
 
