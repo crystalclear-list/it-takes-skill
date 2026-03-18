@@ -1,0 +1,89 @@
+{
+  "name": "prod – discoagents – dispatch – post",
+  "nodes": [
+    {
+      "id": "da000001-0000-0000-0000-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, -180],
+      "parameters": {
+        "content": "## DiscoAgents – Dispatch\n\nReceives a task payload and forwards it to the CrewAI runtime for intelligent dispatch.\nLow-confidence results are automatically queued for human review via the HITL backend.\n\n**Webhook:** `POST /webhook/dispatch`\n**Auth:** `N8N_WEBHOOK_TOKEN_DISPATCH`\n**Downstream:** `http://crewai:8090/run`\n\n**Expected payload:**\n```json\n{\n  \"task_id\": \"task-001\",\n  \"description\": \"Post SZ-0001 to TikTok at 9am slot\",\n  \"agent_name\": \"discoagents-dispatch\"\n}\n```",
+        "width": 560,
+        "height": 280
+      }
+    },
+    {
+      "id": "da000001-0000-0000-0000-000000000002",
+      "name": "Receive Dispatch",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "da000001-0000-0000-0000-000000000099",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatch",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "da000001-0000-0000-0000-000000000003",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_DISPATCH || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_DISPATCH is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "da000001-0000-0000-0000-000000000004",
+      "name": "Call CrewAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://crewai:8090/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ task_id: $json.body?.task_id || String(Date.now()), description: $json.body?.description || '', agent_name: $json.body?.agent_name || 'discoagents-dispatch' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "da000001-0000-0000-0000-000000000005",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', ...($json) }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Dispatch": {
+      "main": [[{ "node": "Auth Check", "type": "main", "index": 0 }]]
+    },
+    "Auth Check": {
+      "main": [[{ "node": "Call CrewAI", "type": "main", "index": 0 }]]
+    },
+    "Call CrewAI": {
+      "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "da000001-0000-0000-0000-000000000000",
+  "versionId": "da000001-0000-0000-0000-000000000000",
+  "tags": [{ "name": "discoagents" }]
+}

@@ -1,0 +1,83 @@
+{
+  "name": "prod – discoagents – caption – post",
+  "nodes": [
+    {
+      "id": "da000002-0000-0000-0000-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, -180],
+      "parameters": {
+        "content": "## DiscoAgents – Caption Renderer\n\nFills `{{hook_line}}` and `{{tease_line}}` into the named caption template\nand returns the rendered string as `caption_rendered`.\n\n**Webhook:** `POST /webhook/caption`\n**Auth:** `N8N_WEBHOOK_TOKEN_CAPTION`\n\n**Expected payload:**\n```json\n{\n  \"post_id\": \"SZ-0001-20260318\",\n  \"caption_template_id\": \"T-1\",\n  \"hook_line\": \"We almost didn't post this…\",\n  \"tease_line\": \"Full video drops tonight 🔥\",\n  \"link_url\": \"https://example.com\"\n}\n```",
+        "width": 560,
+        "height": 280
+      }
+    },
+    {
+      "id": "da000002-0000-0000-0000-000000000002",
+      "name": "Receive Caption Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "da000002-0000-0000-0000-000000000099",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "caption",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "da000002-0000-0000-0000-000000000003",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_CAPTION || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_CAPTION is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "da000002-0000-0000-0000-000000000004",
+      "name": "Render Caption",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "jsCode": "const templates = {\n  'T-1': '{{hook_line}}\\n{{tease_line}}\\n#couplesoftiktok #relationshipgoals #lifestylevlog #adultlife #thatgirl #fyp #foryou #viralcouple',\n  'T-2': '{{hook_line}}\\n{{tease_line}}\\n#fitcheck #outfitcheck #fashiontiktok #selfcare #hotgirlsummer #fyp #viralvideo #trending',\n  'T-3': '{{hook_line}}\\n{{tease_line}}\\n#pov #fyp #foryoupage #relatable #vibes #couplevlog #lifestyleblogger #niche',\n  'T-4': '{{hook_line}}\\n{{tease_line}}\\n#dayinmylife #vlog #reallife #lifestyle #couplethings #fyp #foryou #adultlife',\n  'T-5': '{{hook_line}}\\n{{tease_line}}\\n#fyp #foryoupage #trending #viralcouple #lifestylevlog #exclusive #realones #thatgirl',\n  'I-1': '{{hook_line}}\\n{{tease_line}}\\n#instagramreels #reelsofinstagram #couplegoals #lifestylecreator #adultcreator #exclusive',\n  'I-2': '{{hook_line}}\\n{{tease_line}}\\n#instareels #lifestyle #thatgirl #couplelife #fyp #exclusive #contentcreator',\n  'I-3': '{{hook_line}}\\n{{tease_line}}\\n#reels #couplegoals #realcouple #lifestyleblogger #exclusive #onlyfanscreator',\n  'I-4': '{{hook_line}}\\n{{tease_line}}\\n#confidence #selfcare #hotgirlera #reels #lifestyle #exclusive #adultcreator',\n  'I-5': '{{hook_line}}\\n{{tease_line}}\\n#reels #exclusive #vip #onlyfans',\n  'X-1': '{{hook_line}}\\n{{tease_line}}',\n  'X-2': '{{hook_line}}\\n{{tease_line}}',\n  'X-3': '{{hook_line}}\\n{{tease_line}}',\n  'X-4': '{{hook_line}}\\n{{tease_line}}',\n  'X-5': '{{hook_line}}\\n{{tease_line}}',\n  'F-1': '{{hook_line}}\\n{{tease_line}}',\n  'F-2': '{{hook_line}}\\n{{tease_line}}',\n  'F-3': '{{hook_line}}\\n{{tease_line}}',\n};\n\nconst body = $json.body || $json;\nconst { caption_template_id, hook_line = '', tease_line = '', link_url = '', post_id = '' } = body;\nconst tmpl = templates[caption_template_id] || '{{hook_line}}\\n{{tease_line}}';\nconst rendered = tmpl\n  .replace(/\\{\\{hook_line\\}\\}/g,  hook_line)\n  .replace(/\\{\\{tease_line\\}\\}/g, tease_line)\n  .replace(/\\{\\{link_url\\}\\}/g,   link_url);\n\nreturn [{ json: { ...body, caption_rendered: rendered } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "da000002-0000-0000-0000-000000000005",
+      "name": "Respond with Caption",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', post_id: $json.post_id, caption_rendered: $json.caption_rendered }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Caption Request": {
+      "main": [[{ "node": "Auth Check", "type": "main", "index": 0 }]]
+    },
+    "Auth Check": {
+      "main": [[{ "node": "Render Caption", "type": "main", "index": 0 }]]
+    },
+    "Render Caption": {
+      "main": [[{ "node": "Respond with Caption", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "da000002-0000-0000-0000-000000000000",
+  "versionId": "da000002-0000-0000-0000-000000000000",
+  "tags": [{ "name": "discoagents" }]
+}
