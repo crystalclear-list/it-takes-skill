@@ -224,7 +224,7 @@ The `infra__60day_repeat_guard` workflow prevents posting the same video twice w
 ### Deployment
 
 - [x] Promoted `manifests/staging/reengagement_segment_builder.json` → `manifests/workflows/`
-- [ ] Commit hash: `____________` on `feature/n8n-integration-blueprint-impl`
+- [x] Commit hash: `5f4ad3f` on `feature/n8n-integration-blueprint-impl`
 
 ---
 
