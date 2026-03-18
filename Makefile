@@ -5,7 +5,7 @@
 PYTHON := python3
 PYTEST := $(PYTHON) -m pytest
 
-.PHONY: check test validate agent-schema health install run logs
+.PHONY: check test validate agent-schema health install run logs archive tag schedule
 
 ## Full pre-push gate — runs everything CI runs, in the same order.
 check: install test validate agent-schema health
@@ -36,6 +36,23 @@ run:
 ## Tail the most recent log:  make logs WORKFLOW=manifest_validator
 logs:
 	cd $(CURDIR) && $(PYTHON) scripts/tail_logs.py $(WORKFLOW)
+
+## Scan a video directory and generate config/video_archive.csv skeleton.
+## Usage: make archive DIR=/path/to/your/videos
+archive:
+	$(PYTHON) scripts/generate_archive_csv.py $(DIR)
+
+## Interactively tag bucket_id and theme_day in config/video_archive.csv.
+## Opens each TikTok URL in your browser. q=quit, s=skip, b=back.
+tag:
+	$(PYTHON) scripts/tag_archive.py
+
+## Generate rolling post schedule → config/post_schedule.csv
+## Usage: make schedule           (240 days from today)
+##        make schedule DAYS=60   (custom day count)
+##        make schedule START=2026-04-01 DAYS=120
+schedule:
+	$(PYTHON) scripts/build_schedule.py --days $(or $(DAYS),240) $(if $(START),--start $(START),)
 
 ## Install Python dependencies (matches CI).
 install:

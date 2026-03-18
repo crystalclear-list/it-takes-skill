@@ -17,7 +17,7 @@
 
 ### TikTok: Two-Account Strategy
 
-**Account A — Main (`@thesteelezone`)**
+**Account A — Main (`@the-steele-zone`)**
 - Personality-forward: couple content, lifestyle, relationship energy, "day in our life" framing.
 - Slower cadence (1×/day or 5×/week). Warmer, more parasocial.
 - Bio: pushes to IG. Never mentions OF by name. Uses "exclusive content → link in bio" language.
@@ -57,7 +57,7 @@
 ### YouTube Shorts
 
 **Worth it only if:** you have clips with strong hook-in-first-3-seconds that aren't dependent on TikTok sound trends.
-- If yes: create a `@thesteelezone` YT channel, post 1 Short/day from the archive's most visually arresting clips.
+- If yes: create a `@the-steele-zone` YT channel, post 1 Short/day from the archive's most visually arresting clips.
 - YT Shorts can appear in Google search results — long-tail discovery value.
 - Description: `More at linkfly.to/thesteelezone` — YT allows link hub references.
 - If your archive skews toward audio-driven trends, skip YT Shorts for now.
@@ -67,7 +67,7 @@
 ```
 Button 1: 🔥 OnlyFans – Exclusive Content     → onlyfans.com/thesteelezone
 Button 2: 📸 Instagram                          → instagram.com/thesteelezone
-Button 3: 🎵 TikTok                             → tiktok.com/@thesteelezone
+Button 3: 🎵 TikTok                             → tiktok.com/@the-steele-zone
 Button 4: 🐦 Twitter / X                        → x.com/thesteelezone
 Button 5: 💌 DM Me on IG (Customs/Requests)    → instagram.com/thesteelezone (DM)
 ```
@@ -335,7 +335,7 @@ X and FB enter the funnel at the link-hub or OF level directly, bypassing the IG
 ```
 THESTEELEZONE 🖤
 Couple | Lifestyle | Exclusive Content
-📲 TikTok → @thesteelezone
+📲 TikTok → @the-steele-zone
 🔥 Full Access Below ↓
 linkfly.to/thesteelezone
 ```
