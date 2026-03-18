@@ -9,18 +9,12 @@ node_modules/
 # -----------------------------
 # Logs
 # -----------------------------
-# Ignore all logs by default
-logs/*
-
-# But DO track workflow logs
-!logs/workflows/
-!logs/workflows/*.log
+logs/
 
 # -----------------------------
 # Reports
 # -----------------------------
-# Track all reports
-!reports/
+reports/
 
 # -----------------------------
 # Build artifacts
