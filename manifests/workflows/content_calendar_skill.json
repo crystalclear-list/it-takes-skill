@@ -1,0 +1,311 @@
+{
+  "workflow_id": "content_calendar_skill",
+  "name": "Cross-Platform Content Calendar Skill",
+  "description": "Governed 5-step calendar dispatch skill for SteeleZone and DiscoBass. Reads config/post_schedule.csv, generates one dispatch proposal per scheduled row for the target date, audits all proposals, writes validated proposals to manifests/staging/ for operator review, and reports. No platform post fires automatically — operator promotes proposals. Three human approval gates apply.",
+  "risk_level": "medium",
+
+  "inputs": {
+    "schedule_date": {
+      "type": "string",
+      "description": "Target date to dispatch in YYYY-MM-DD format. Must match rows in config/post_schedule.csv."
+    },
+    "brand_filter": {
+      "type": "string",
+      "description": "Brand to dispatch for. Enum: steelezone | discobass | all. Default: all.",
+      "enum": ["steelezone", "discobass", "all"]
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this calendar run is being triggered. Non-empty; logged for audit trail."
+    }
+  },
+
+  "outputs": {
+    "proposals_path": {
+      "type": "string",
+      "description": "Path to the staged dispatch proposal file written to manifests/staging/."
+    },
+    "proposal_count": {
+      "type": "string",
+      "description": "Number of dispatch proposals generated."
+    },
+    "audit_verdict": {
+      "type": "string",
+      "description": "pass or halt — audit agent decision across all proposals."
+    },
+    "report_path": {
+      "type": "string",
+      "description": "Path to the operator-review summary written to reports/."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "repo_maintenance",
+      "agent_id": "repo-agent"
+    },
+    {
+      "role": "workflow_executor",
+      "agent_id": "workflow-agent"
+    },
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "manifest_editor",
+      "agent_id": "manifest-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "staging_only_manifest_writes": true,
+    "human_approval_required_for": [
+      "calendar_dispatch_to_production",
+      "discobass_posting_approval",
+      "steelezone_adult_content_approval"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["manifests/staging/", "logs/workflows/", "reports/"],
+    "forbidden_write_paths": [
+      "governance/",
+      "agents/core/",
+      "manifests/workflows/",
+      "config/",
+      ".git/",
+      "skills/",
+      "engine/"
+    ],
+    "enforce_staging_only": true
+  },
+
+  "audit_requirements": {
+    "enforce_audit_agent": true,
+    "audit_role": "audit_enforcer",
+    "halt_on_violation": true,
+    "log_provenance": true,
+    "audit_log_path": "logs/workflows/content_calendar_skill.log",
+    "required_checks": [
+      "schedule_schema_valid",
+      "no_pii_in_schedule_cells",
+      "proposal_category_in_approved_set",
+      "no_forbidden_platform_or_category",
+      "payload_keys_within_allowlist",
+      "auth_env_var_named_not_valued",
+      "no_direct_external_api_calls_outside_http_post_n8n"
+    ]
+  },
+
+  "steps": [
+    {
+      "id": "step_1_validate_schedule",
+      "name": "Validate schedule file schema",
+      "description": "Repo Agent reads config/post_schedule.csv and validates: file exists, required columns present (post_id, video_id, platform, brand, scheduled_date, time_slot, caption_template_id, hashtag_set_id, link_url), brand column contains only approved values (steelezone | discobass), no PII patterns in any cell. Halts if schedule is missing, malformed, or contains unapproved brand values.",
+      "agent_role": "repo_maintenance",
+      "agent_id": "repo-agent",
+      "constraints": {
+        "allowed_tools": ["git_status", "governance_read_only"],
+        "allowed_paths": ["config/post_schedule.csv", "logs/workflows/"],
+        "forbidden_tools": [
+          "git_add_files",
+          "git_commit_safe",
+          "git_rebase",
+          "git_reset_hard",
+          "git_push_force",
+          "local_fs_write",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/n8n_endpoints.json",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure read-only schedule validation. Any schema violation, PII, or unapproved brand value halts the run immediately."
+      }
+    },
+    {
+      "id": "step_2_generate_proposals",
+      "name": "Generate dispatch proposals from schedule",
+      "description": "Workflow Agent reads config/post_schedule.csv rows matching schedule_date and brand_filter. For each matching row, generates a structured dispatch proposal: resolves the logical n8n endpoint name from platform+brand mapping, builds payload from schedule columns, attaches trigger_reason and n8n_run_id. No HTTP calls. Proposals are held in memory until step 3 audit passes.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_read", "log_emit"],
+        "allowed_paths": [
+          "config/post_schedule.csv",
+          "config/n8n_endpoints.json",
+          "logs/workflows/"
+        ],
+        "forbidden_tools": [
+          "http_post_n8n",
+          "network_calls",
+          "local_fs_write",
+          "git_operations",
+          "governance_file_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Read-only proposal generation. No network calls, no file writes. Any row referencing an unknown endpoint or forbidden platform halts the run."
+      }
+    },
+    {
+      "id": "step_3_audit_proposals",
+      "name": "Audit all proposals for violations",
+      "description": "Audit Agent validates every proposal generated in step 2: category in {content_automation}, no forbidden platforms or categories, all payload keys within the endpoint's allowed_payload_keys list, no PII patterns in payload values, auth env var is a name not a value. Any proposal violation halts the entire run — partial dispatch is not permitted.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "policy_evaluator", "log_reader", "governance_read_only"],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "governance/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Audit only. Writes audit verdict to logs/ and reports/. Any single proposal violation halts the entire run — all-or-nothing enforcement."
+      }
+    },
+    {
+      "id": "step_4_write_staging_proposals",
+      "name": "Write validated proposals to manifests/staging/",
+      "description": "Manifest Agent writes the full set of audit-approved proposals to manifests/staging/calendar_proposals_<date>.json. Each proposal includes: endpoint logical name, payload, trigger_reason, audit_verdict=pass, CR reference. The proposal file is not executable — it is a human-reviewable record that the operator promotes to trigger actual dispatch.",
+      "agent_role": "manifest_editor",
+      "agent_id": "manifest-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_read", "local_fs_write_staging"],
+        "allowed_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "governance/",
+          "docs/",
+          "config/n8n_endpoints.json",
+          "manifests/staging/"
+        ],
+        "forbidden_tools": [
+          "production_manifest_write",
+          "governance_write",
+          "schema_deletion",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/",
+          "skills/",
+          "engine/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [
+          "calendar_dispatch_to_production",
+          "discobass_posting_approval",
+          "steelezone_adult_content_approval"
+        ],
+        "description": "Writes proposals to manifests/staging/ only. Proposals cannot self-promote — operator must explicitly trigger production dispatch after reviewing this file."
+      }
+    },
+    {
+      "id": "step_5_report",
+      "name": "Report: write operator-review summary",
+      "description": "Reporting Agent writes a human-readable summary to reports/: schedule_date, brand_filter, proposal_count per brand and platform, audit verdict, path to staged proposals file, and next-step instructions (which human approval gates apply, how to promote). Never logs full URLs, tokens, or PII.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["markdown_renderer", "template_engine", "log_reader", "governance_read_only"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": [
+          "git_operations",
+          "network_calls",
+          "http_post_n8n",
+          "governance_write",
+          "manifest_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Writes only to logs/workflows/ and reports/. Summary is the operator's primary artifact for review before approving dispatch."
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/content_calendar_skill.log"
+  }
+}

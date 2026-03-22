@@ -1,0 +1,95 @@
+{
+  "name": "prod – discoagents – reporting – post",
+  "nodes": [
+    {
+      "id": "da000003-0000-0000-0000-000000000001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, -180],
+      "parameters": {
+        "content": "## DiscoAgents – Reporting\n\nFetches the approval queue from the HITL backend and returns the list.\nDefault status filter is `pending`; pass `status=approved|rejected` to query history.\n\n**Webhook:** `POST /webhook/reporting`\n**Auth:** `N8N_WEBHOOK_TOKEN_REPORTING`\n**Downstream:** `http://approval-api:8002/approvals`\n\n**Expected payload:**\n```json\n{\n  \"status\": \"pending\",\n  \"report_period\": \"2026-03-18\"\n}\n```",
+        "width": 520,
+        "height": 260
+      }
+    },
+    {
+      "id": "da000003-0000-0000-0000-000000000002",
+      "name": "Receive Report Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "da000003-0000-0000-0000-000000000099",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reporting",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "da000003-0000-0000-0000-000000000003",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_REPORTING || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_REPORTING is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "da000003-0000-0000-0000-000000000004",
+      "name": "Fetch Approvals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://approval-api:8002/approvals",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "={{ $json.body?.status || $json.status || 'pending' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "da000003-0000-0000-0000-000000000005",
+      "name": "Respond with Approvals",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', count: Array.isArray($json) ? $json.length : 0, approvals: $json }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Report Request": {
+      "main": [[{ "node": "Auth Check", "type": "main", "index": 0 }]]
+    },
+    "Auth Check": {
+      "main": [[{ "node": "Fetch Approvals", "type": "main", "index": 0 }]]
+    },
+    "Fetch Approvals": {
+      "main": [[{ "node": "Respond with Approvals", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "da000003-0000-0000-0000-000000000000",
+  "versionId": "da000003-0000-0000-0000-000000000000",
+  "tags": [{ "name": "discoagents" }]
+}

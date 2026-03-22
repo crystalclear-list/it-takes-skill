@@ -1,0 +1,259 @@
+{
+  "workflow_id": "tiktok_repost_skill",
+  "name": "TikTok Repost Skill — SteeleZone",
+  "description": "Governed 4-step dispatch skill for SteeleZone daily TikTok reposts. Reads post_schedule.csv, runs pre-dispatch audit, dispatches to content__tiktok_repost_daily n8n endpoint, writes structured dispatch report. Daily human review gate required before dispatch fires. No production manifest or governance file may be modified.",
+  "risk_level": "medium",
+
+  "inputs": {
+    "schedule_source": {
+      "type": "string",
+      "description": "Path to the post schedule file. Must be config/post_schedule.csv — no external or dynamic sources permitted.",
+      "enum": ["config/post_schedule.csv"]
+    },
+    "target_account": {
+      "type": "string",
+      "description": "TikTok repost account to target. Enum-locked to steelezone_repost — Account A (@the-steele-zone) cannot be targeted via this skill.",
+      "enum": ["steelezone_repost"]
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this repost is being triggered. Non-empty; logged for full audit trail."
+    }
+  },
+
+  "outputs": {
+    "dispatch_status": {
+      "type": "string",
+      "description": "success or failed."
+    },
+    "audit_pre_check_passed": {
+      "type": "string",
+      "description": "true if all 7 pre-dispatch audit gates passed."
+    },
+    "report_path": {
+      "type": "string",
+      "description": "Path to dispatch summary written to reports/."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "repo_maintenance",
+      "agent_id": "repo-agent"
+    },
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "workflow_executor",
+      "agent_id": "workflow-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "staging_only_manifest_writes": true,
+    "human_approval_required_for": [
+      "daily_review_gate_steelezone",
+      "content_promotion_to_production",
+      "repost_outside_approved_schedule_window"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["logs/workflows/", "reports/"],
+    "forbidden_write_paths": [
+      "governance/",
+      "agents/core/",
+      "manifests/workflows/",
+      "manifests/staging/",
+      "config/",
+      ".git/",
+      "skills/",
+      "engine/"
+    ],
+    "enforce_staging_only": true
+  },
+
+  "audit_requirements": {
+    "enforce_audit_agent": true,
+    "audit_role": "audit_enforcer",
+    "halt_on_violation": true,
+    "log_provenance": true,
+    "audit_log_path": "logs/workflows/tiktok_repost_skill.log",
+    "required_checks": [
+      "trigger_reason_non_empty",
+      "logical_name_in_allowlist",
+      "url_is_https",
+      "url_host_matches_global_constraint",
+      "payload_keys_within_allowlist",
+      "no_pii_in_payload_values",
+      "auth_env_var_set_and_non_empty"
+    ]
+  },
+
+  "skills": [
+    "audit_n8n_payload",
+    "dispatch_n8n_workflow",
+    "summarize_n8n_dispatch"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_validate_schedule",
+      "name": "Validate post schedule file",
+      "description": "Repo Agent reads config/post_schedule.csv and validates: file exists, required columns present (post_id, video_id, platform, brand, scheduled_date, time_slot), no PII patterns in any cell, at least one row with platform=tiktok_repost for today's date. Halts if schedule is missing or malformed.",
+      "agent_role": "repo_maintenance",
+      "agent_id": "repo-agent",
+      "constraints": {
+        "allowed_tools": ["git_status", "governance_read_only"],
+        "allowed_paths": ["config/post_schedule.csv", "logs/workflows/"],
+        "forbidden_tools": [
+          "git_add_files",
+          "git_commit_safe",
+          "git_rebase",
+          "git_reset_hard",
+          "git_push_force",
+          "local_fs_write",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/n8n_endpoints.json",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure read-only schedule validation. Any missing file, malformed schema, or PII detection halts the run immediately."
+      }
+    },
+    {
+      "id": "step_2_pre_dispatch_audit",
+      "name": "Pre-dispatch audit: validate endpoint, payload, PII, and auth",
+      "description": "Audit Agent runs audit_n8n_payload skill: validates logical name content__tiktok_repost_daily is in allowlist, URL is HTTPS on approved host, payload keys match allowlist, no PII in values, auth env var N8N_WEBHOOK_TOKEN_TIKTOK is set. Any failure is a GovernanceError — step 3 dispatch never runs.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "policy_evaluator", "log_reader", "governance_read_only"],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Audit only — no HTTP calls. Writes audit result to logs/ and reports/. Any gate failure halts dispatch."
+      }
+    },
+    {
+      "id": "step_3_dispatch",
+      "name": "Dispatch: POST to content__tiktok_repost_daily n8n endpoint",
+      "description": "Workflow Agent calls dispatch_n8n_workflow skill. Only executes if audit_pre_check_passed=true from step 2. HTTPS POST to content__tiktok_repost_daily with token from N8N_WEBHOOK_TOKEN_TIKTOK env var. Logs n8n host and HTTP status code only — no full URL path, no token, no response body.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "constraints": {
+        "allowed_tools": ["http_post_n8n", "log_emit"],
+        "allowed_paths": ["logs/workflows/"],
+        "forbidden_tools": [
+          "local_fs_write",
+          "git_operations",
+          "network_calls",
+          "governance_file_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": ["daily_review_gate_steelezone"],
+        "description": "Dispatch step. Requires human confirmation of the daily repost queue before firing (adult-content platform risk). Only http_post_n8n is permitted — not network_calls."
+      }
+    },
+    {
+      "id": "step_4_report",
+      "name": "Report: write dispatch summary to reports/ and logs/workflows/",
+      "description": "Reporting Agent calls summarize_n8n_dispatch skill. Writes human-readable summary: logical name, category, n8n host (not full URL), HTTP status code, audit verdict, run ID. Never logs full URL path, token, raw response body, or PII.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["markdown_renderer", "template_engine", "log_reader", "governance_read_only"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": [
+          "git_operations",
+          "network_calls",
+          "http_post_n8n",
+          "governance_write",
+          "manifest_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Writes only to logs/workflows/ and reports/. No manifest, config, or governance files may be modified."
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/tiktok_repost_skill.log"
+  }
+}

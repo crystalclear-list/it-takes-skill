@@ -1,0 +1,128 @@
+{
+  "name": "THESTEELEZONE \u2014 Weekly Report",
+  "nodes": [
+    {
+      "id": "1afb8752-80a8-4875-9a94-70a33692008c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -100
+      ],
+      "parameters": {
+        "content": "## Weekly Summary\n\nGenerates weekly post performance report.\nReplace the Code node with your actual reporting logic.\n\n**Webhook:** `/webhook/weekly-summary`\n**Auth:** `N8N_WEBHOOK_TOKEN_REPORTING`",
+        "width": 500,
+        "height": 180
+      }
+    },
+    {
+      "id": "13908ee0-c0c9-4c0f-a5f9-82b55b52dc15",
+      "name": "Receive Report Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "00c5bb0b-b16b-4122-aa52-38388f593b82",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "weekly-summary",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "5cb0204a-e3bc-4a26-8f4a-68e8286490d8",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Auth check \u2014 validates Bearer token from Authorization header\nconst auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_REPORTING || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_REPORTING is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "5e313564-df38-4e38-bf5e-d44cff8ee1a4",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Weekly summary placeholder\n// Replace with your reporting logic:\n//   - Query n8n execution history\n//   - Count successes / failures per platform\n//   - Write summary to a Google Sheet, Notion, or email\nconst { report_period, trigger_reason } = $json;\nconsole.log(`Weekly report triggered: ${report_period} \u2014 ${trigger_reason}`);\nreturn [{ json: { status: 'report_placeholder', report_period, trigger_reason } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "71ae360a-825f-45b9-8ebc-050fbd035005",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status:\"ok\", ...$json}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Report Request": {
+      "main": [
+        [
+          {
+            "node": "Auth Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e84227f2-ab29-4f34-a498-81208393a167",
+  "id": "6d54396c-a32f-4e17-bd93-ad1ef030a1b4",
+  "tags": [
+    {
+      "name": "steelezone"
+    }
+  ]
+}

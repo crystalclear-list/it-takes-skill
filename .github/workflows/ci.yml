@@ -10,6 +10,8 @@ jobs:
   test:
     name: Tests + Governance Checks
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
@@ -58,7 +60,7 @@ jobs:
           python - <<'EOF'
           from engine.runtime import run
 
-          EXPECTED_VALID   = {"manifest_validator", "governance_health_check", "agent_validator"}
+          EXPECTED_VALID   = {"manifest_validator", "governance_health_check", "agent_validator", "n8n_dispatch_basic"}
           EXPECTED_INVALID = {"bad_actor_workflow"}
 
           result  = run("manifest_validator", input_data={"target_scope": "all", "trigger_reason": "ci"})

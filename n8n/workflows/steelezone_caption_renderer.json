@@ -1,0 +1,128 @@
+{
+  "name": "THESTEELEZONE \u2014 Caption Renderer",
+  "nodes": [
+    {
+      "id": "705df92f-6388-49f7-9834-c4d2ee6aed66",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -100
+      ],
+      "parameters": {
+        "content": "## Caption Renderer\n\nFills `{{hook_line}}` and `{{tease_line}}` into the named template.\nCall this **before** the Post Dispatcher to generate `caption_rendered`.\n\n**Webhook:** `/webhook/caption-render`\n**Auth:** `N8N_WEBHOOK_TOKEN_CAPTION`",
+        "width": 500,
+        "height": 180
+      }
+    },
+    {
+      "id": "da24b295-64ab-425b-9a2f-e6609f006570",
+      "name": "Receive Caption Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "34e7c911-631e-4552-8cd7-c9843f71d446",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "caption-render",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "cbde820c-e112-466b-9b83-fad663f0ea15",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Auth check \u2014 validates Bearer token from Authorization header\nconst auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_CAPTION || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_CAPTION is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "3d4b6d70-19c2-4c96-babd-20b425501237",
+      "name": "Render Caption",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Caption renderer \u2014 fills {{hook_line}} and {{tease_line}} into a template\n// and appends the hashtag block.\n//\n// Template map (matches docs/blueprints/social-repost-blueprint.md)\nconst templates = {\n  \"T-1\": \"{{hook_line}}\\n{{tease_line}}\\n#couplesoftiktok #relationshipgoals #lifestylevlog #adultlife #thatgirl #fyp #foryou #viralcouple\",\n  \"T-2\": \"{{hook_line}}\\n{{tease_line}}\\n#fitcheck #outfitcheck #fashiontiktok #selfcare #hotgirlsummer #fyp #viralvideo #trending\",\n  \"T-3\": \"{{hook_line}}\\n{{tease_line}}\\n#pov #fyp #foryoupage #relatable #vibes #couplevlog #lifestyleblogger #niche\",\n  \"T-4\": \"{{hook_line}}\\n{{tease_line}}\\n#dayinmylife #vlog #reallife #lifestyle #couplethings #fyp #foryou #adultlife\",\n  \"T-5\": \"{{hook_line}}\\n{{tease_line}}\\n#fyp #foryoupage #trending #viralcouple #lifestylevlog #exclusive #realones #thatgirl\",\n  \"I-1\": \"{{hook_line}}\\n{{tease_line}}\\n#instagramreels #reelsofinstagram #couplegoals #lifestylecreator #adultcreator #exclusive\",\n  \"I-2\": \"{{hook_line}}\\n{{tease_line}}\\n#instareels #lifestyle #thatgirl #couplelife #fyp #exclusive #contentcreator\",\n  \"I-3\": \"{{hook_line}}\\n{{tease_line}}\\n#reels #couplegoals #realcouple #lifestyleblogger #exclusive #onlyfanscreator\",\n  \"I-4\": \"{{hook_line}}\\n{{tease_line}}\\n#confidence #selfcare #hotgirlera #reels #lifestyle #exclusive #adultcreator\",\n  \"I-5\": \"{{hook_line}}\\n{{tease_line}}\\n#reels #exclusive #vip #onlyfans\",\n  \"X-1\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"X-2\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"X-3\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"X-4\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"X-5\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"F-1\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"F-2\": \"{{hook_line}}\\n{{tease_line}}\",\n  \"F-3\": \"{{hook_line}}\\n{{tease_line}}\",\n};\n\nconst { caption_template_id, hook_line = '', tease_line = '', link_url = '' } = $json;\nconst tmpl = templates[caption_template_id] || '{{hook_line}}\\n{{tease_line}}';\nlet rendered = tmpl\n  .replace(/\\{\\{hook_line\\}\\}/g,  hook_line)\n  .replace(/\\{\\{tease_line\\}\\}/g, tease_line)\n  .replace(/\\{\\{link_url\\}\\}/g,   link_url);\n\nreturn [{ json: { ...$json, caption_rendered: rendered } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "6c065314-35ac-44f6-a933-ea86e33877b8",
+      "name": "Respond with Caption",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status:\"ok\", caption_rendered:$json.caption_rendered, post_id:$json.post_id}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Caption Request": {
+      "main": [
+        [
+          {
+            "node": "Auth Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "node": "Render Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Caption": {
+      "main": [
+        [
+          {
+            "node": "Respond with Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5ee8534c-f41a-4b2e-843f-b6e5f443582c",
+  "id": "94af4716-1760-4ad3-8b52-3384f60f490f",
+  "tags": [
+    {
+      "name": "steelezone"
+    }
+  ]
+}

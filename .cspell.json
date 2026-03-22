@@ -1,0 +1,19 @@
+{
+  "version": "0.2",
+  "ignorePaths": [
+    "config/video_archive.csv",
+    "config/post_schedule.csv",
+    "config/video_archive_viewer.html",
+    "logs/**",
+    "reports/**"
+  ],
+  "words": [
+    "agentic",
+    "steelezone",
+    "tiktokv",
+    "tiktokcdn",
+    "linkfly",
+    "onlyfans",
+    "discobass"
+  ]
+}
