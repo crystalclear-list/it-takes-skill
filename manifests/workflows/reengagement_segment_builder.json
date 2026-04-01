@@ -1,0 +1,312 @@
+{
+  "workflow_id": "reengagement_segment_builder",
+  "name": "Re-engagement Segment Builder",
+  "description": "Governed 5-step re-engagement engine. Dispatches to n8n to segment old followers into warm/cool/cold tiers by engagement recency, PII-audits all returned rows, writes approved=false segment proposals to manifests/staging/, and surfaces a human review deck for operator action before any calendar dispatch fires. Warm segment requires mandatory operator caption review before promotion.",
+  "risk_level": "medium",
+
+  "inputs": {
+    "platform": {
+      "type": "string",
+      "description": "Platform to segment. Enum: tiktok | instagram | email.",
+      "enum": ["tiktok", "instagram", "email"]
+    },
+    "brand": {
+      "type": "string",
+      "description": "Brand to segment. Enum: discobass | steelezone.",
+      "enum": ["discobass", "steelezone"]
+    },
+    "lookback_days": {
+      "type": "integer",
+      "description": "Days of engagement history to analyse. Must be 1–180. Segments: warm=30–60d, cool=60–90d, cold=90–180d.",
+      "minimum": 1,
+      "maximum": 180
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this segment build is being triggered. Non-empty; logged for audit trail."
+    }
+  },
+
+  "outputs": {
+    "segments_path": {
+      "type": "string",
+      "description": "Path to the staged segment file written to manifests/staging/segments_<brand>_<date>.json."
+    },
+    "segment_counts": {
+      "type": "string",
+      "description": "Counts per tier: {warm: N, cool: N, cold: N}."
+    },
+    "pii_audit_verdict": {
+      "type": "string",
+      "description": "pass or halt — PII audit decision across all returned segment rows."
+    },
+    "review_deck_path": {
+      "type": "string",
+      "description": "Path to the operator review deck written to reports/."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "workflow_executor",
+      "agent_id": "workflow-agent"
+    },
+    {
+      "role": "manifest_editor",
+      "agent_id": "manifest-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "staging_only_manifest_writes": true,
+    "human_approval_required_for": [
+      "warm_segment_review",
+      "segment_promotion_to_calendar"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["manifests/staging/", "logs/workflows/", "reports/"],
+    "forbidden_write_paths": [
+      "governance/",
+      "agents/core/",
+      "manifests/workflows/",
+      "config/",
+      ".git/",
+      "skills/",
+      "engine/"
+    ],
+    "enforce_staging_only": true
+  },
+
+  "audit_requirements": {
+    "enforce_audit_agent": true,
+    "audit_role": "audit_enforcer",
+    "halt_on_violation": true,
+    "log_provenance": true,
+    "audit_log_path": "logs/workflows/reengagement_segment_builder.log",
+    "required_checks": [
+      "platform_enum_valid",
+      "brand_enum_valid",
+      "lookback_days_in_range",
+      "trigger_reason_non_empty",
+      "no_pii_in_segment_rows",
+      "user_id_opaque_format",
+      "segment_enum_valid",
+      "engagement_score_in_range",
+      "approved_defaults_false",
+      "no_paid_retargeting_export"
+    ]
+  },
+
+  "steps": [
+    {
+      "id": "step_1_validate_inputs",
+      "name": "Validate workflow inputs",
+      "description": "Audit Agent validates all inputs before any dispatch: platform must be one of tiktok|instagram|email, brand must be one of discobass|steelezone, lookback_days must be an integer in [1, 180], trigger_reason must be non-empty. Any validation failure halts immediately — no n8n dispatch fires on invalid inputs.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "policy_evaluator", "log_reader", "governance_read_only"],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "governance/",
+          "logs/workflows/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure input validation. No writes, no network calls. Invalid inputs halt the run before any data leaves the OS."
+      }
+    },
+    {
+      "id": "step_2_dispatch_segment_build",
+      "name": "Dispatch to n8n segment builder",
+      "description": "Workflow Agent dispatches to the content__reengage_segment_build n8n endpoint via http_post_n8n with payload keys: platform, brand, lookback_days, trigger_reason, n8n_run_id. Receives segment classification rows from n8n. Does not write rows to disk — rows are held in memory and passed to step 3 for PII audit. Only fires if step_1 audit_pre_check_passed=true.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "constraints": {
+        "allowed_tools": ["http_post_n8n", "log_emit"],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "logs/workflows/"
+        ],
+        "forbidden_tools": [
+          "network_calls",
+          "local_fs_write",
+          "git_operations",
+          "governance_file_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/n8n_endpoints.json",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Dispatch step. http_post_n8n is the only permitted outbound tool — network_calls is explicitly denied. Segment rows are NOT written to disk here; they pass directly to step 3."
+      }
+    },
+    {
+      "id": "step_3_pii_audit_rows",
+      "name": "PII audit on returned segment rows",
+      "description": "Audit Agent inspects every row returned by n8n. Checks: (1) no email address, phone number, full name, or partial name in any column; (2) user_id is an opaque platform identifier — numeric string for TikTok/IG, 64-char hex SHA-256 for email-platform users; (3) segment value is one of warm|cool|cold; (4) engagement_score is a float in [0.0, 1.0]; (5) approved field is present and defaults to false. Any PII detection or schema violation is a GovernanceError — the entire run halts and no rows are written to staging.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "policy_evaluator", "log_reader", "governance_read_only"],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "governance/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "PII gate. Any row containing PII triggers GovernanceError and halts the entire run. Audit verdict and violation details written to logs/ and reports/ for operator inspection."
+      }
+    },
+    {
+      "id": "step_4_write_staging_segments",
+      "name": "Write validated segment rows to manifests/staging/",
+      "description": "Manifest Agent writes all PII-clean segment rows to manifests/staging/segments_<brand>_<date>.json. Every row has approved set to false. The file embeds the CR reference (2026-03-18-reengagement-engine-phase-3) and the audit run ID from step 3. This file is not executable — no calendar dispatch or repost fires until the operator explicitly sets approved=true on selected rows and promotes the file.",
+      "agent_role": "manifest_editor",
+      "agent_id": "manifest-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_read", "local_fs_write_staging"],
+        "allowed_paths": [
+          "manifests/staging/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "production_manifest_write",
+          "governance_write",
+          "schema_deletion",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/",
+          "skills/",
+          "engine/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [
+          "warm_segment_review",
+          "segment_promotion_to_calendar"
+        ],
+        "description": "Writes segment rows to manifests/staging/ only. approved=false on all rows — no dispatch fires without operator action. Paid retargeting export is explicitly excluded from this workflow."
+      }
+    },
+    {
+      "id": "step_5_write_review_deck",
+      "name": "Write operator review deck",
+      "description": "Reporting Agent writes a structured operator review deck to reports/reengagement_review_<brand>_<date>.json and a human-readable summary. Deck includes: segment counts by tier (warm/cool/cold), top-performing posts per tier, draft captions per brand (warm tier gets personalization prompt templates), 60-day repeat guard status per slot, approval instructions, and CR reference. Never logs PII, full URLs, or tokens.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["markdown_renderer", "template_engine", "log_reader", "governance_read_only"],
+        "allowed_paths": ["reports/", "logs/workflows/", "manifests/staging/"],
+        "forbidden_tools": [
+          "git_operations",
+          "network_calls",
+          "http_post_n8n",
+          "governance_write",
+          "manifest_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Writes only to logs/workflows/ and reports/. Review deck is the primary operator artifact — warm segment review and segment_promotion_to_calendar gates must be cleared before any calendar dispatch fires."
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/reengagement_segment_builder.log"
+  }
+}

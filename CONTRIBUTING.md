@@ -98,6 +98,33 @@ A skill is ready to merge when:
 
 ---
 
+## n8n Endpoint Config Rules
+
+All n8n HTTP endpoints are defined in `config/n8n_endpoints.json`. Each endpoint must include:
+
+- `category`: one of:
+  - `content_automation` — posting, captioning, scheduling, or any content workflow
+  - `infra_sensitive` — operations that touch infra, secrets, or data pipelines
+  - `reporting` — analytics, dashboards, or metrics-only flows
+
+The test suite enforces this and will fail CI if any endpoint uses another value.
+
+### When adding or editing endpoints
+
+1. Update `config/n8n_endpoints.json` with the new endpoint.
+2. Choose a valid `category` from the list above.
+3. Run the targeted test locally before pushing:
+
+   ```bash
+   ./scripts/check_n8n_endpoints.sh
+   ```
+
+4. Only open a PR once this passes.
+
+If you truly need a new category, update the allowed set in `tests/test_n8n.py` in the same PR and document the rationale in the change-request doc.
+
+---
+
 ## 🚫 What We Don't Accept
 
 - Skills with no governance contract

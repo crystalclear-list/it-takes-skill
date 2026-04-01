@@ -1,0 +1,358 @@
+{
+  "name": "THESTEELEZONE \u2014 Post Dispatcher",
+  "nodes": [
+    {
+      "id": "f6d68d1b-4fda-41c1-8e11-efde870fea98",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -200
+      ],
+      "parameters": {
+        "content": "## THESTEELEZONE \u2014 Post Dispatcher\n\nReceives all scheduled posts from `config/post_schedule.csv` via the governed OS.\n\n**Webhook path:** `/webhook/steelezone-dispatch`\n**Auth:** Bearer token \u2192 set `N8N_WEBHOOK_TOKEN_DISPATCH` in n8n env vars\n\n**To activate:**\n1. Set `N8N_WEBHOOK_TOKEN_DISPATCH` in n8n Settings \u2192 Environment Variables\n2. Replace each platform placeholder node with your real posting nodes\n3. Toggle workflow Active \u2192 ON",
+        "width": 700,
+        "height": 260
+      }
+    },
+    {
+      "id": "bce7865c-5cde-4a76-9d9a-3d91c62e1ee8",
+      "name": "Receive Post",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "a935f134-2521-4124-9c1c-1802fa7aa5fb",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "steelezone-dispatch",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "75cbcc00-b03b-4bea-b39c-87e454ae9952",
+      "name": "Auth Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Auth check \u2014 validates Bearer token from Authorization header\nconst auth = $input.first().json.headers?.authorization || '';\nconst token = process.env.N8N_WEBHOOK_TOKEN_DISPATCH || '';\nif (!token) throw new Error('Env var N8N_WEBHOOK_TOKEN_DISPATCH is not set');\nif (auth !== 'Bearer ' + token) {\n  throw new Error('Unauthorized: invalid or missing Bearer token');\n}\nreturn $input.all();",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "a1a5a7f2-7d0c-4ae4-96e5-ff37b1c84037",
+      "name": "Route by Platform",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "tiktok_repost",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "tiktok_repost"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "ig_reel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "ig_reel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "x",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "x"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "facebook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "facebook"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "be090431-8ed9-4d3c-8d36-138b1034d428",
+      "name": "TikTok Repost",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// \u2500\u2500 TIKTOK POSTING LOGIC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// This node is a placeholder. Replace with your TikTok node(s).\n//\n// Available fields from payload:\n//   $json.post_id        \u2014 unique post identifier\n//   $json.video_id       \u2014 e.g. SZ-0001\n//   $json.caption_rendered \u2014 full caption text (fill via caption_render webhook first)\n//   $json.hashtag_set_id \u2014 e.g. TT-H1\n//   $json.link_url       \u2014 resolved CTA link for this platform\n//   $json.scheduled_date \u2014 ISO date\n//   $json.time_slot      \u2014 AM | PM\n//\n// Steps to complete this node:\n//   1. Delete this Code node\n//   2. Add a TikTok node (or HTTP Request node) with your credentials\n//   3. Map the fields above into the posting action\n//   4. Connect its output to the Respond node\n\nconsole.log('[TikTok] post triggered:', $json.post_id, $json.video_id);\nreturn [{ json: { status: 'placeholder \u2014 add your TikTok node here', ...$json } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "32c7279d-a9c6-4158-a4dd-4d9db891083d",
+      "name": "IG Reel Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// \u2500\u2500 INSTAGRAM REEL POSTING LOGIC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// This node is a placeholder. Replace with your Instagram Reel node(s).\n//\n// Available fields from payload:\n//   $json.post_id        \u2014 unique post identifier\n//   $json.video_id       \u2014 e.g. SZ-0001\n//   $json.caption_rendered \u2014 full caption text (fill via caption_render webhook first)\n//   $json.hashtag_set_id \u2014 e.g. TT-H1\n//   $json.link_url       \u2014 resolved CTA link for this platform\n//   $json.scheduled_date \u2014 ISO date\n//   $json.time_slot      \u2014 AM | PM\n//\n// Steps to complete this node:\n//   1. Delete this Code node\n//   2. Add a Instagram Reel node (or HTTP Request node) with your credentials\n//   3. Map the fields above into the posting action\n//   4. Connect its output to the Respond node\n\nconsole.log('[Instagram Reel] post triggered:', $json.post_id, $json.video_id);\nreturn [{ json: { status: 'placeholder \u2014 add your Instagram Reel node here', ...$json } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "330d7b60-ad73-4192-b4d8-c63c1240dde5",
+      "name": "X Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// \u2500\u2500 X / TWITTER POSTING LOGIC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// This node is a placeholder. Replace with your X / Twitter node(s).\n//\n// Available fields from payload:\n//   $json.post_id        \u2014 unique post identifier\n//   $json.video_id       \u2014 e.g. SZ-0001\n//   $json.caption_rendered \u2014 full caption text (fill via caption_render webhook first)\n//   $json.hashtag_set_id \u2014 e.g. TT-H1\n//   $json.link_url       \u2014 resolved CTA link for this platform\n//   $json.scheduled_date \u2014 ISO date\n//   $json.time_slot      \u2014 AM | PM\n//\n// Steps to complete this node:\n//   1. Delete this Code node\n//   2. Add a X / Twitter node (or HTTP Request node) with your credentials\n//   3. Map the fields above into the posting action\n//   4. Connect its output to the Respond node\n\nconsole.log('[X / Twitter] post triggered:', $json.post_id, $json.video_id);\nreturn [{ json: { status: 'placeholder \u2014 add your X / Twitter node here', ...$json } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "82dbe57e-6826-485f-85c2-1f559fd36a2a",
+      "name": "Facebook Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        580
+      ],
+      "parameters": {
+        "jsCode": "// \u2500\u2500 FACEBOOK POSTING LOGIC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// This node is a placeholder. Replace with your Facebook node(s).\n//\n// Available fields from payload:\n//   $json.post_id        \u2014 unique post identifier\n//   $json.video_id       \u2014 e.g. SZ-0001\n//   $json.caption_rendered \u2014 full caption text (fill via caption_render webhook first)\n//   $json.hashtag_set_id \u2014 e.g. TT-H1\n//   $json.link_url       \u2014 resolved CTA link for this platform\n//   $json.scheduled_date \u2014 ISO date\n//   $json.time_slot      \u2014 AM | PM\n//\n// Steps to complete this node:\n//   1. Delete this Code node\n//   2. Add a Facebook node (or HTTP Request node) with your credentials\n//   3. Map the fields above into the posting action\n//   4. Connect its output to the Respond node\n\nconsole.log('[Facebook] post triggered:', $json.post_id, $json.video_id);\nreturn [{ json: { status: 'placeholder \u2014 add your Facebook node here', ...$json } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "2b4dca5f-7f4e-423b-83f8-362f2eee989d",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status:\"ok\", post_id:$json.post_id, platform:$json.platform}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "7865ed28-703c-4261-9fc3-928d077f8351",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status:\"error\", message:$json.message}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Post": {
+      "main": [
+        [
+          {
+            "node": "Auth Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "node": "Route by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "TikTok Repost",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IG Reel Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "X Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TikTok Repost": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IG Reel Post": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Post": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fdc23f73-61eb-4eb4-8f27-424d28b9ff50",
+  "id": "67d09bdb-3b63-42fa-a663-fbfc162472f8",
+  "tags": [
+    {
+      "name": "steelezone"
+    }
+  ]
+}

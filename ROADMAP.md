@@ -12,9 +12,10 @@ The bedrock. The first principles. The canonical structure.
 - [x] Publish `SKILL_PERIODIC_TABLE.md` — the taxonomy of all skills
 - [x] Create governance scaffolding: `safety-rules.md`, `execution-contracts.md`
 - [x] Write `docs/architecture.md` and `docs/skill-design-guide.md`
-- [ ] Publish first 10 Atomic skills with full specs
+- [ ] Publish first 10 Atomic skills with full specs (schema-complete, validated, and with at least one passing test example each)
 - [ ] Build first 3 Molecular skills from Atomic compositions
 - [ ] Write `docs/how-to-add-a-skill.md`
+- [ ] Wire `safety-rules.md` and `execution-contracts.md` into CI so every PR is checked for governance violations
 
 ---
 
@@ -57,6 +58,7 @@ Intelligence that acts.
 - [ ] Integration adapters: webhooks, APIs, message queues
 - [ ] `governance/domain-allowlist.json` — machine-readable safety constraints
 - [ ] Skill OS CLI: `skill run`, `skill validate`, `skill compose`
+- [ ] Enforce staging-only execution for new skills by default; promotion to production requires passing audit + human approval
 
 ---
 

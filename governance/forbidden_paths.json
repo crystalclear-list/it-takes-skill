@@ -9,7 +9,8 @@
     "manifests/staging",
     ".git",
     "skills",
-    "engine"
+    "engine",
+    "config"
   ],
   "allowed_write_paths": [
     "reports",

@@ -1,0 +1,140 @@
+{
+  "workflow_id": "n8n_dispatch_basic",
+  "name": "Governed n8n Dispatch",
+  "description": "Single governed path for invoking any approved n8n endpoint by logical name. Audit Agent validates URL, method, payload keys, and absence of PII before dispatch. No n8n call is made without a full pre-dispatch audit pass.",
+  "risk_level": "medium",
+
+  "inputs": {
+    "logical_workflow_name": {
+      "type": "string",
+      "description": "Logical workflow name as defined in config/n8n_endpoints.json. Must exactly match an approved endpoint key."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Bounded JSON payload. Top-level keys must be in the endpoint's allowed_payload_keys list. No PII permitted."
+    },
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this dispatch is being triggered (human-readable, required for audit trail)."
+    }
+  },
+
+  "outputs": {
+    "dispatch_status": {
+      "type": "string",
+      "description": "success or failed."
+    },
+    "http_status_code": {
+      "type": "string",
+      "description": "HTTP response code from n8n."
+    },
+    "summary": {
+      "type": "object",
+      "description": "Human-readable dispatch summary: logical name, status, host, audit verdict."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "workflow_executor",
+      "agent_id": "workflow-agent"
+    },
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "human_approval_required_for": [
+      "adding_new_n8n_endpoints_to_allowlist",
+      "changing_global_constraints",
+      "dispatching_infra_sensitive_workflows"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["logs/workflows/", "reports/"],
+    "forbidden_write_paths": ["governance/", "agents/core/", "manifests/workflows/", "config/", ".git/"],
+    "enforce_staging_only": true
+  },
+
+  "skills": [
+    "audit_n8n_payload",
+    "dispatch_n8n_workflow",
+    "summarize_n8n_dispatch"
+  ],
+
+  "steps": [
+    {
+      "id": "step_1_pre_dispatch_audit",
+      "name": "Pre-dispatch audit: validate endpoint, payload, PII, and auth",
+      "description": "Audit Agent validates: logical name in allowlist, URL is HTTPS on approved host, payload keys match allowlist, no PII in payload values, auth env var is set. Any failure is a GovernanceError — dispatch never runs.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": ["json_schema_validate", "governance_read_only", "local_fs_read"],
+        "allowed_paths": ["config/n8n_endpoints.json"],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls", "http_post_n8n"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": []
+      }
+    },
+    {
+      "id": "step_2_dispatch",
+      "name": "Dispatch: POST to approved n8n endpoint",
+      "description": "Workflow Agent invokes http_post_n8n only after audit_pre_check_passed is True. HTTPS POST to resolved URL with token from env var. Logs host + status code only.",
+      "agent_role": "workflow_executor",
+      "agent_id": "workflow-agent",
+      "constraints": {
+        "allowed_tools": ["http_post_n8n"],
+        "allowed_paths": [],
+        "forbidden_tools": ["local_fs_write", "git_operations", "network_calls", "governance_file_write"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": []
+      }
+    },
+    {
+      "id": "step_3_report",
+      "name": "Report: write dispatch summary to reports/ and logs/workflows/",
+      "description": "Reporting Agent writes a human-readable summary artifact. Logs logical name, category, host, status code, and audit verdict. Never logs full URL path, token, or raw response body.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_write_staging"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": ["git_operations", "network_calls", "http_post_n8n"],
+        "forbidden_paths": ["governance/", "agents/core/", "manifests/workflows/", "config/", ".git/"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": []
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/n8n_dispatch_basic.log"
+  }
+}

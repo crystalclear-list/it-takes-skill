@@ -1,0 +1,318 @@
+{
+  "workflow_id": "content_automation_deploy",
+  "name": "Content Automation Deploy",
+  "description": "Governed 5-step pipeline for proposing and auditing a single n8n content skill or endpoint change. Runs CI validation, schema-validates all staging manifests, runs shadow audit, generates a minimal staging diff, then reports. All writes are staging-only. No production manifest, governance file, or config may be modified. Human approval required before any promotion.",
+  "risk_level": "medium",
+
+  "inputs": {
+    "trigger_reason": {
+      "type": "string",
+      "description": "Why this deploy pipeline is being initiated (human-readable, required for audit trail)."
+    },
+    "target_endpoint_or_skill": {
+      "type": "string",
+      "description": "Logical name of the single n8n endpoint or skill to be proposed (e.g. content__tiktok_repost_daily). Must already exist in config/n8n_endpoints.json or be staged as a new entry in this run."
+    },
+    "change_request_id": {
+      "type": "string",
+      "description": "CR doc ID in docs/change-requests/ that authorises this deploy (e.g. 2026-03-18-content-automation-phase-1)."
+    }
+  },
+
+  "outputs": {
+    "ci_validation_status": {
+      "type": "string",
+      "description": "pass or fail — whether repo state and tests are clean."
+    },
+    "manifest_validation_status": {
+      "type": "string",
+      "description": "pass or fail — whether all staging manifests are schema-valid."
+    },
+    "shadow_audit_verdict": {
+      "type": "string",
+      "description": "pass or fail — shadow audit result for the proposed endpoint or skill change."
+    },
+    "staging_diff_path": {
+      "type": "string",
+      "description": "Path to the proposed diff file written to manifests/staging/."
+    },
+    "report_path": {
+      "type": "string",
+      "description": "Path to the human-readable deploy summary written to reports/."
+    }
+  },
+
+  "required_agents": [
+    {
+      "role": "repo_maintenance",
+      "agent_id": "repo-agent"
+    },
+    {
+      "role": "audit_enforcer",
+      "agent_id": "audit-agent"
+    },
+    {
+      "role": "manifest_editor",
+      "agent_id": "manifest-agent"
+    },
+    {
+      "role": "report_generator",
+      "agent_id": "reporting-agent"
+    }
+  ],
+
+  "governance_requirements": {
+    "halt_on_violation": true,
+    "no_destructive_git_operations": true,
+    "no_infrastructure_mutation": true,
+    "no_financial_actions": true,
+    "no_pii_leakage": true,
+    "no_schema_deletion": true,
+    "no_governance_modification": true,
+    "staging_only_manifest_writes": true,
+    "human_approval_required_for": [
+      "content_skill_promotion_to_production",
+      "n8n_endpoint_config_changes",
+      "production_manifest_writes",
+      "governance_file_writes",
+      "config_directory_writes"
+    ]
+  },
+
+  "staging_requirements": {
+    "allowed_write_paths": ["manifests/staging/", "logs/workflows/", "reports/"],
+    "forbidden_write_paths": [
+      "governance/",
+      "agents/core/",
+      "manifests/workflows/",
+      "config/",
+      ".git/",
+      "skills/",
+      "engine/"
+    ],
+    "enforce_staging_only": true
+  },
+
+  "audit_requirements": {
+    "enforce_audit_agent": true,
+    "audit_role": "audit_enforcer",
+    "halt_on_violation": true,
+    "log_provenance": true,
+    "audit_log_path": "logs/workflows/content_automation_deploy.log",
+    "required_checks": [
+      "repo_state_cleanliness",
+      "staging_manifest_schema_compliance",
+      "endpoint_category_validity",
+      "no_pii_in_payload_keys",
+      "auth_env_var_present_and_named_not_valued",
+      "https_url_only",
+      "no_excluded_category_used"
+    ]
+  },
+
+  "steps": [
+    {
+      "id": "step_1_ci_validation",
+      "name": "CI validation: confirm repo state and test baseline",
+      "description": "Repo Agent reads git status and confirms the working tree is clean, the branch is current with remote, and the last CI run passed. Any uncommitted changes or failing tests halt the pipeline before any proposal is generated.",
+      "agent_role": "repo_maintenance",
+      "agent_id": "repo-agent",
+      "constraints": {
+        "allowed_tools": ["git_status", "git_diff", "governance_read_only"],
+        "allowed_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "manifests/staging/",
+          "governance/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "git_add_files",
+          "git_commit_safe",
+          "git_rebase",
+          "git_reset_hard",
+          "git_push_force",
+          "git_history_rewrite",
+          "local_fs_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": ["governance/", "config/", ".git/", "skills/", "engine/"]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": true,
+        "requires_human_approval": [],
+        "description": "Pure read-only git introspection. Any dirty working tree or test failure halts the run immediately."
+      }
+    },
+    {
+      "id": "step_2_manifest_validation",
+      "name": "Manifest validation: schema-validate all staging proposals",
+      "description": "Audit Agent loads all JSON files from manifests/staging/ and validates each against governance/schemas/manifest.schema.json. Any schema violation halts the pipeline — a bad staging proposal must be fixed before the deploy can proceed. Writes audit result to logs/workflows/ and reports/.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": [
+          "json_schema_validate",
+          "policy_evaluator",
+          "log_reader",
+          "governance_read_only"
+        ],
+        "allowed_paths": [
+          "agents/core/",
+          "manifests/workflows/",
+          "manifests/staging/",
+          "governance/",
+          "logs/workflows/",
+          "reports/",
+          "docs/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Read-only schema validation. Writes audit result only to logs/workflows/ and reports/. Any manifest that fails schema is a halt condition."
+      }
+    },
+    {
+      "id": "step_3_shadow_audit",
+      "name": "Shadow audit: evaluate proposed endpoint or skill change",
+      "description": "Audit Agent runs in shadow mode against the target endpoint or skill change identified in inputs.target_endpoint_or_skill. Checks: category is in {content_automation, infra_sensitive, reporting}, URL is HTTPS on approved host, auth_env_var is a name not a value, payload keys are bounded, no PII patterns, no excluded category used. Produces a structured audit report. Any violation halts the pipeline.",
+      "agent_role": "audit_enforcer",
+      "agent_id": "audit-agent",
+      "constraints": {
+        "allowed_tools": [
+          "json_schema_validate",
+          "policy_evaluator",
+          "log_reader",
+          "governance_read_only"
+        ],
+        "allowed_paths": [
+          "config/n8n_endpoints.json",
+          "governance/",
+          "manifests/staging/",
+          "logs/workflows/",
+          "reports/"
+        ],
+        "forbidden_tools": [
+          "governance_write",
+          "schema_modification",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Shadow mode only — no dispatch, no real HTTP calls. Writes audit verdict to reports/ and logs/workflows/. Any audit gate failure halts the run."
+      }
+    },
+    {
+      "id": "step_4_propose_diff",
+      "name": "Propose diff: write minimal staging manifest for content skill or endpoint",
+      "description": "Manifest Agent generates the minimal proposed change for the single target endpoint or skill. Writes one new or updated manifest file to manifests/staging/ only. The diff must reference this CR, the shadow audit report, and the change_request_id input. No production manifest, config file, or governance file is touched.",
+      "agent_role": "manifest_editor",
+      "agent_id": "manifest-agent",
+      "constraints": {
+        "allowed_tools": ["local_fs_read", "local_fs_write_staging"],
+        "allowed_paths": [
+          "agents/core/", "manifests/workflows/", "governance/", "docs/",
+          "config/n8n_endpoints.json", "manifests/staging/"
+        ],
+        "forbidden_tools": [
+          "production_manifest_write",
+          "governance_write",
+          "schema_deletion",
+          "git_operations",
+          "infrastructure_mutation",
+          "financial_tools",
+          "http_post_n8n",
+          "network_calls"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/",
+          "skills/",
+          "engine/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": ["content_skill_promotion_to_production"],
+        "description": "Writes to manifests/staging/ only. The proposed diff is not a promotion — it cannot be moved to manifests/workflows/ without separate human approval and a passing audit enforce run."
+      }
+    },
+    {
+      "id": "step_5_report",
+      "name": "Report: write deploy summary to reports/ and logs/workflows/",
+      "description": "Reporting Agent synthesises a human-readable summary of the full pipeline run: CI status, manifest validation results, shadow audit verdict, and the path of the proposed staging diff. Logs logical name, category, audit verdict, and CR reference. Never logs full URLs, tokens, raw API responses, or PII.",
+      "agent_role": "report_generator",
+      "agent_id": "reporting-agent",
+      "constraints": {
+        "allowed_tools": ["markdown_renderer", "template_engine", "log_reader", "governance_read_only"],
+        "allowed_paths": ["reports/", "logs/workflows/"],
+        "forbidden_tools": [
+          "git_operations",
+          "network_calls",
+          "http_post_n8n",
+          "governance_write",
+          "manifest_write",
+          "infrastructure_mutation",
+          "financial_tools"
+        ],
+        "forbidden_paths": [
+          "governance/",
+          "agents/core/",
+          "manifests/workflows/",
+          "config/",
+          ".git/"
+        ]
+      },
+      "safety": {
+        "halt_on_violation": true,
+        "no_writes": false,
+        "requires_human_approval": [],
+        "description": "Writes only to logs/workflows/ and reports/. No manifest or governance files can be modified."
+      }
+    }
+  ],
+
+  "logging": {
+    "provenance": true,
+    "log_workflow_start_and_end": true,
+    "log_each_step_boundary": true,
+    "workflow_log_path": "logs/workflows/content_automation_deploy.log"
+  }
+}
